@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Geologycraft: servidor SMP vanilla de Minecraft Java 26.3. Entra en geologycraft.lol">
+<meta property="og:title" content="Geologycraft">
+<meta property="og:description" content="Servidor SMP vanilla entre amigos. Entra en geologycraft.lol">
+<style>[hidden]{display:none!important} img{max-width:100%} body{margin:0}</style>
+<title>Geologycraft</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&family=Silkscreen:wght@400;700&display=swap">
+<style>
+/* Layout: la pagina es una columna estratigrafica. Cada seccion es un estrato con su
+   cota Y de Minecraft en un riel lateral: de la superficie (Y 64) al bedrock (Y -64). */
+:root {
+  --bg: #f1f3ee;
+  --surface: #ffffff;
+  --fg: #18211c;
+  --muted: #56645b;
+  --line: #d5dbd3;
+  --accent: #23874a;
+  --accent-2: #1f7380;
+  --on-accent: #ffffff;
+  --grass: #5f9a3c;
+  --dirt: #85603d;
+  --stone: #8a918b;
+  --deepslate: #4a4f57;
+  --sculk: #0d4a55;
+  --bedrock: #2b2b2b;
+  --ok: #23874a;
+  --off: #b3402f;
+  --p1: #2f9e44; --p2: #7aa22a; --p3: #c99a06; --p4: #d56a1f; --p5: #c9302c;
+  --font-display: "Silkscreen", "Courier New", monospace;
+  --font-body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111614; --surface: #19201c; --fg: #e6ede8; --muted: #9caaa1; --line: #2b352f;
+    --accent: #45c76a; --accent-2: #3ab0c0; --on-accent: #0c1410;
+    --stone: #6f7771; --deepslate: #3c4148; --bedrock: #1d1d1d;
+    --ok: #45c76a; --off: #ff7a66;
+    --p1: #4cc764; --p2: #a8cf45; --p3: #f2c53d; --p4: #ff8f45; --p5: #ff5a52;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111614; --surface: #19201c; --fg: #e6ede8; --muted: #9caaa1; --line: #2b352f;
+  --accent: #45c76a; --accent-2: #3ab0c0; --on-accent: #0c1410;
+  --stone: #6f7771; --deepslate: #3c4148; --bedrock: #1d1d1d;
+  --ok: #45c76a; --off: #ff7a66;
+  --p1: #4cc764; --p2: #a8cf45; --p3: #f2c53d; --p4: #ff8f45; --p5: #ff5a52;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: var(--font-body); font-size: 17px; line-height: 1.6;
+  padding-inline: 16px; padding-block: 0;
+}
+a { color: var(--accent-2); }
+a:focus-visible, button:focus-visible { outline: 3px solid var(--accent-2); outline-offset: 3px; border-radius: 4px; }
+.wrap { max-width: 980px; margin-inline: auto; }
+
+/* ---------- estratos ---------- */
+.stratum { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 28px; }
+.rail { position: relative; display: flex; flex-direction: column; align-items: center; }
+.rail .band {
+  width: 100%; flex: 1; min-height: 100%;
+  background-image:
+    linear-gradient(90deg, rgba(0,0,0,.10) 50%, transparent 50%),
+    linear-gradient(rgba(0,0,0,.10) 50%, transparent 50%);
+  background-size: 12px 12px, 12px 12px;
+  background-position: 0 0, 6px 6px;
+  background-color: var(--band);
+}
+.rail .y {
+  position: absolute; top: 18px; left: 50%; transform: translateX(-50%);
+  font-family: var(--font-mono); font-size: 12px; font-weight: 600; letter-spacing: .04em;
+  background: var(--bg); color: var(--fg); padding: 2px 6px; border-radius: 3px;
+  border: 1px solid var(--line); white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.content { padding-block: 56px; min-width: 0; }
+.eyebrow {
+  font-family: var(--font-mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--muted); margin: 0 0 8px;
+}
+h2 { font-family: var(--font-display); font-weight: 700; font-size: clamp(24px, 4vw, 32px); line-height: 1.15; margin: 0 0 16px; text-wrap: balance; letter-spacing: .01em; }
+p { margin: 0 0 14px; max-width: 65ch; }
+.lead { color: var(--muted); }
+
+/* ---------- hero ---------- */
+.hero .content { padding-block: 72px 56px; }
+.wordmark {
+  font-family: var(--font-display); font-weight: 700;
+  font-size: clamp(38px, 9vw, 84px); line-height: .95; margin: 0 0 18px; letter-spacing: .02em;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  text-wrap: balance;
+}
+.tagline { font-size: clamp(17px, 2.2vw, 20px); margin-bottom: 28px; }
+.tagline strong { color: var(--fg); }
+.join { display: flex; flex-wrap: wrap; gap: 12px; align-items: stretch; margin-bottom: 18px; }
+.addr {
+  display: flex; align-items: center; gap: 10px; min-width: 0;
+  background: var(--surface); border: 2px solid var(--fg); border-radius: 6px; padding: 6px 6px 6px 16px;
+  box-shadow: 4px 4px 0 var(--fg);
+}
+.addr code { font-family: var(--font-mono); font-size: clamp(17px, 3vw, 22px); font-weight: 600; overflow-wrap: anywhere; }
+button, .btn {
+  font: inherit; font-weight: 700; cursor: pointer; border-radius: 4px; text-decoration: none;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 8px 16px;
+}
+.copy { background: var(--accent); color: var(--on-accent); border: 0; }
+.copy:hover { filter: brightness(1.08); }
+.discord { background: transparent; color: var(--fg); border: 2px solid var(--fg); }
+.discord:hover { background: var(--fg); color: var(--bg); }
+.status { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; color: var(--muted); font-size: 15px; }
+.dot { width: 12px; height: 12px; border-radius: 2px; background: var(--muted); flex: none; }
+.status[data-state="on"] .dot { background: var(--ok); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ok) 25%, transparent); }
+.status[data-state="off"] .dot { background: var(--off); }
+.status b { color: var(--fg); }
+.players { font-family: var(--font-mono); font-size: 13px; }
+.facts { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 28px; padding-top: 18px; border-top: 1px dashed var(--line); font-size: 15px; color: var(--muted); }
+.facts span b { color: var(--fg); font-weight: 700; }
+
+/* ---------- pasos ---------- */
+.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-top: 8px; }
+.step { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 18px 20px; min-width: 0; }
+.step h3 { font-size: 18px; margin: 0 0 8px; }
+.step p { font-size: 16px; margin-bottom: 8px; }
+.cmd { font-family: var(--font-mono); font-size: 14px; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 2px 6px; white-space: nowrap; }
+
+/* ---------- escala de pranks ---------- */
+.scale { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 10px; }
+.lvl {
+  display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 16px; align-items: start;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 14px 18px;
+}
+.lvl .n {
+  font-family: var(--font-display); font-size: 30px; line-height: 1; color: var(--c);
+  width: 48px; height: 48px; display: grid; place-items: center;
+  border: 3px solid var(--c); border-radius: 50%;
+}
+.lvl h3 { margin: 2px 0 2px; font-size: 18px; color: var(--c); }
+.lvl p { margin: 0; font-size: 16px; color: var(--fg); }
+.meter { display: flex; gap: 3px; margin-top: 8px; }
+.meter i { display: block; height: 6px; flex: 1; max-width: 34px; border-radius: 1px; background: var(--line); }
+.meter i.on { background: var(--c); }
+.rule-min {
+  margin-top: 18px; padding: 14px 18px; border-left: 4px solid var(--accent-2);
+  background: color-mix(in srgb, var(--accent-2) 10%, var(--surface)); border-radius: 0 6px 6px 0; max-width: 65ch;
+}
+
+/* ---------- reglas ---------- */
+.rules { counter-reset: r; list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 4px; }
+.rules li {
+  counter-increment: r; display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 12px;
+  padding: 14px 0; border-bottom: 1px solid var(--line); max-width: 75ch;
+}
+.rules li::before {
+  content: counter(r); font-family: var(--font-display); font-size: 22px; color: var(--accent); line-height: 1.3;
+}
+.rules b { display: block; }
+.rules span { color: var(--muted); font-size: 16px; }
+
+/* ---------- mapa ---------- */
+.map { margin: 12px 0 0; }
+.map figure { margin: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 10px; max-width: 760px; }
+.map img { display: block; width: 100%; height: auto; image-rendering: pixelated; border-radius: 3px; }
+.map figcaption { font-size: 14px; color: var(--muted); padding: 8px 4px 0; }
+.map .empty {
+  aspect-ratio: 16 / 9; max-width: 100%; display: grid; place-items: center; text-align: center; padding: 20px;
+  color: var(--muted); border-radius: 3px;
+  background-image: linear-gradient(45deg, var(--line) 25%, transparent 25%, transparent 75%, var(--line) 75%),
+                    linear-gradient(45deg, var(--line) 25%, transparent 25%, transparent 75%, var(--line) 75%);
+  background-size: 24px 24px; background-position: 0 0, 12px 12px;
+}
+.map .empty span { background: var(--surface); padding: 8px 12px; border-radius: 4px; }
+
+/* ---------- pie ---------- */
+.foot .content { padding-block: 40px 56px; color: var(--muted); font-size: 14px; }
+.foot p { max-width: 70ch; }
+
+@media (max-width: 640px) {
+  body { font-size: 16px; }
+  .stratum { grid-template-columns: 34px minmax(0, 1fr); gap: 14px; }
+  .rail .y { writing-mode: vertical-rl; transform: translateX(-50%) rotate(180deg); padding: 6px 2px; }
+  .content { padding-block: 40px; }
+  .hero .content { padding-block: 48px 40px; }
+  .lvl { grid-template-columns: 44px minmax(0, 1fr); padding: 12px 14px; gap: 12px; }
+  .lvl .n { width: 40px; height: 40px; font-size: 24px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .status[data-state="on"] .dot { animation: pulse 2.4s ease-in-out infinite; }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--ok) 0%, transparent); } }
+}
+</style>
+</head>
+<body>
+
+
+<main class="wrap">
+
+  <!-- Y 64: superficie -->
+  <section class="stratum hero" style="--band: var(--grass)" aria-labelledby="t-hero">
+    <div class="rail" aria-hidden="true"><div class="band"></div><span class="y">Y 64</span></div>
+    <div class="content">
+      <p class="eyebrow">Servidor SMP · Minecraft Java</p>
+      <h1 class="wordmark" id="t-hero">GEOLOGYCRAFT</h1>
+      <p class="tagline lead">Supervivencia <strong>vanilla</strong> entre amigos, sin tiendas ni teletransportes. Construye, explora y gana tu lugar en el mundo. La Ancient City del spawn será la puerta a <strong>The Sift</strong>.</p>
+
+      <div class="join">
+        <div class="addr">
+          <code id="addr">geologycraft.lol</code>
+          <button class="copy" id="copy" type="button">Copiar</button>
+        </div>
+        <a class="btn discord" href="https://discord.gg/RxxBJwTwz" target="_blank" rel="noopener">Únete al Discord</a>
+      </div>
+
+      <div class="status" id="status" data-state="unknown" aria-live="polite">
+        <span class="dot" aria-hidden="true"></span>
+        <span id="status-text">Consultando el estado del servidor…</span>
+        <span class="players" id="players"></span>
+      </div>
+
+      <div class="facts">
+        <span>Versión <b>26.3</b></span>
+        <span>Premium y <b>no premium</b></span>
+        <span>Chat de <b>voz por proximidad</b></span>
+        <span>Dificultad <b>difícil</b></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Y 32: tierra -->
+  <section class="stratum" style="--band: var(--dirt)" aria-labelledby="t-entrar">
+    <div class="rail" aria-hidden="true"><div class="band"></div><span class="y">Y 32</span></div>
+    <div class="content">
+      <p class="eyebrow">Primeros pasos</p>
+      <h2 id="t-entrar">Cómo entrar</h2>
+      <p class="lead">Abre Minecraft Java 26.3, agrega el servidor con la dirección <span class="cmd">geologycraft.lol</span> y entra.</p>
+      <div class="steps">
+        <div class="step">
+          <h3>Cuenta premium</h3>
+          <p>Entras directo. El servidor verifica tu cuenta con Mojang y no te pide contraseña.</p>
+        </div>
+        <div class="step">
+          <h3>Cuenta no premium</h3>
+          <p>La primera vez crea tu clave:</p>
+          <p><span class="cmd">/register clave clave</span></p>
+          <p>Después, cada vez que entres: <span class="cmd">/login clave</span></p>
+        </div>
+        <div class="step">
+          <h3>Skin</h3>
+          <p>Si no eres premium, elige tu skin con el nombre de cualquier cuenta:</p>
+          <p><span class="cmd">/skin nombre</span></p>
+        </div>
+        <div class="step">
+          <h3>Chat de voz</h3>
+          <p>Instala el mod <a href="https://modrinth.com/plugin/simple-voice-chat" target="_blank" rel="noopener">Simple Voice Chat</a> en tu cliente para hablar con quien esté cerca. Es opcional.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Y 0: piedra -->
+  <section class="stratum" style="--band: var(--stone)" aria-labelledby="t-prank">
+    <div class="rail" aria-hidden="true"><div class="band"></div><span class="y">Y 0</span></div>
+    <div class="content">
+      <p class="eyebrow">Escala de pranks</p>
+      <h2 id="t-prank">Niveles de prank</h2>
+      <p class="lead">Cada jugador elige hasta dónde le pueden hacer bromas. Su número aparece junto a su nombre en el chat y en el TAB. Elige el tuyo con <span class="cmd">/prank 1</span> a <span class="cmd">/prank 5</span>.</p>
+      <ol class="scale">
+        <li class="lvl" style="--c: var(--p1)"><span class="n" aria-hidden="true">1</span><div><h3>Pacífico</h3><p>Solo bromas sanas: carteles, decoraciones, regalos raros. Nada se rompe ni se pierde.</p><div class="meter" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i><i></i></div></div></li>
+        <li class="lvl" style="--c: var(--p2)"><span class="n" aria-hidden="true">2</span><div><h3>Travieso</h3><p>Bromas leves y reversibles: mover o esconder cosas, tapar entradas, cambiar bloques decorativos.</p><div class="meter" aria-hidden="true"><i class="on"></i><i class="on"></i><i></i><i></i><i></i></div></div></li>
+        <li class="lvl" style="--c: var(--p3)"><span class="n" aria-hidden="true">3</span><div><h3>Molesto</h3><p>Bromas que molestan pero no destruyen: llenar de bloques o mobs, trampas que no matan. Sin explosiones.</p><div class="meter" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></div></div></li>
+        <li class="lvl" style="--c: var(--p4)"><span class="n" aria-hidden="true">4</span><div><h3>Peligroso</h3><p>Trampas que pueden matar y hacerte perder ítems. La base no se destruye.</p><div class="meter" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></div></div></li>
+        <li class="lvl" style="--c: var(--p5)"><span class="n" aria-hidden="true">5</span><div><h3>Caos</h3><p>Sin límites: explosiones, base destruida, todo vale.</p><div class="meter" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></div></div></li>
+      </ol>
+      <div class="rule-min">
+        <b>Entre dos jugadores vale el nivel más bajo.</b> Si tú eres 5 y la otra persona es 2, entre ustedes solo valen bromas de nivel 2. Revisa el de alguien con <span class="cmd">/prank nombre</span>. Subir de nivel es inmediato; bajar toma 24 horas.
+      </div>
+    </div>
+  </section>
+
+  <!-- Y -32: deepslate -->
+  <section class="stratum" style="--band: var(--deepslate)" aria-labelledby="t-reglas">
+    <div class="rail" aria-hidden="true"><div class="band"></div><span class="y">Y -32</span></div>
+    <div class="content">
+      <p class="eyebrow">Convivencia</p>
+      <h2 id="t-reglas">Reglas</h2>
+      <ol class="rules">
+        <li><div><b>Buena onda primero.</b><span>Las bromas son bienvenidas; los insultos, el acoso y la discriminación no.</span></div></li>
+        <li><div><b>Respeta los niveles de prank.</b><span>Entre dos jugadores vale el más bajo. Si no conoces el nivel de alguien, revísalo antes con /prank.</span></div></li>
+        <li><div><b>Lo ajeno no se toca fuera del nivel acordado.</b><span>Robar o romper una base sin acuerdo es grifeo. Todo queda registrado y se puede revertir.</span></div></li>
+        <li><div><b>Nada de hacks ni clientes con ventaja.</b><span>Prohibido xray, fly, kill aura, auto-clicker y radares de minerales o de entidades. Se permiten mods de rendimiento, shaders y minimapas sin radar.</span></div></li>
+        <li><div><b>Granjas sí, lag no.</b><span>Las granjas técnicas y los dupers vanilla (TNT, rieles, alfombras) están permitidos. Las máquinas hechas para generar lag o botar el servidor, no.</span></div></li>
+        <li><div><b>El spawn y la Ancient City son de todos.</b><span>No se destruyen: la Ancient City será la entrada a The Sift.</span></div></li>
+        <li><div><b>Una cuenta por persona.</b><span>Tu clave es tuya; no la compartas.</span></div></li>
+        <li><div><b>Si tienes dudas o un problema, avisa a un admin en Discord.</b><span>Las decisiones de los admins se respetan.</span></div></li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- Y -48: sculk -->
+  <section class="stratum" style="--band: var(--sculk)" aria-labelledby="t-mapa">
+    <div class="rail" aria-hidden="true"><div class="band"></div><span class="y">Y -48</span></div>
+    <div class="content">
+      <p class="eyebrow">Vista aérea</p>
+      <h2 id="t-mapa">El mundo desde arriba</h2>
+      <p class="lead">Fotos aéreas del spawn tomadas por el servidor, desde el día del lanzamiento. La serie completa está en el canal #mapa-web del Discord.</p>
+      <div class="map">
+        <figure>
+          <img id="map-img" src="mapa.png" alt="Vista aérea del spawn de Geologycraft" hidden>
+          <div class="empty" id="map-empty"><span>La primera foto aparece aquí el día del lanzamiento.</span></div>
+          <figcaption>2.048 × 2.048 bloques alrededor del spawn · 1 píxel = 1 bloque</figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- Y -64: bedrock -->
+  <footer class="stratum foot" style="--band: var(--bedrock)">
+    <div class="rail" aria-hidden="true"><div class="band"></div><span class="y">Y -64</span></div>
+    <div class="content">
+      <p>Geologycraft es un servidor de una comunidad de amigos. No está afiliado a Mojang ni a Microsoft.</p>
+    </div>
+  </footer>
+
+</main>
+
+<script>
+(function () {
+  // Copiar la direccion
+  var btn = document.getElementById('copy');
+  var addr = document.getElementById('addr');
+  btn.addEventListener('click', function () {
+    var text = addr.textContent.trim();
+    var done = function () { btn.textContent = 'Copiado'; setTimeout(function () { btn.textContent = 'Copiar'; }, 1800); };
+    var fallback = function () {
+      var r = document.createRange(); r.selectNodeContents(addr);
+      var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+      btn.textContent = 'Ctrl+C para copiar';
+      setTimeout(function () { btn.textContent = 'Copiar'; }, 2400);
+    };
+    try {
+      navigator.clipboard.writeText(text).then(done, fallback);
+    } catch (e) { fallback(); }
+  });
+
+  // Foto del mapa (mapa.png junto a la pagina)
+  var img = document.getElementById('map-img');
+  img.addEventListener('load', function () { img.hidden = false; document.getElementById('map-empty').hidden = true; });
+
+  // Estado en vivo (api publica mcsrvstat.us)
+  var box = document.getElementById('status');
+  var txt = document.getElementById('status-text');
+  var pl = document.getElementById('players');
+  var ctrl = ('AbortController' in window) ? new AbortController() : null;
+  var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, 8000);
+  fetch('https://api.mcsrvstat.us/3/geologycraft.lol', ctrl ? { signal: ctrl.signal } : {})
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      clearTimeout(timer);
+      if (d && d.online) {
+        box.dataset.state = 'on';
+        var on = d.players ? d.players.online : 0, max = d.players ? d.players.max : 0;
+        txt.innerHTML = '<b>En línea</b> · ' + on + ' de ' + max + ' jugadores';
+        var names = (d.players && d.players.list) ? d.players.list.map(function (p) { return p.name || p; }) : [];
+        pl.textContent = names.length ? names.join(', ') : '';
+      } else {
+        box.dataset.state = 'off';
+        txt.innerHTML = '<b>Fuera de línea</b> por ahora';
+      }
+    })
+    .catch(function () {
+      clearTimeout(timer);
+      box.dataset.state = 'unknown';
+      txt.textContent = 'No se pudo consultar el estado ahora. Prueba entrar directamente.';
+    });
+})();
+</script>
+
+</body>
+</html>
