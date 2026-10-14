@@ -28,6 +28,7 @@
   --stone: #8a918b;
   --deepslate: #4a4f57;
   --sculk: #0d4a55;
+  --end: #8a5cd6;
   --bedrock: #2b2b2b;
   --ok: #23874a;
   --off: #b3402f;
@@ -147,6 +148,11 @@ button, .btn {
 }
 .lvl h3 { margin: 2px 0 2px; font-size: 18px; color: var(--c); }
 .lvl p { margin: 0; font-size: 16px; color: var(--fg); }
+.allow { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 3px; font-size: 15px; }
+.allow li { padding-left: 22px; position: relative; }
+.allow li::before { content: "\2714"; position: absolute; left: 2px; color: var(--c); font-weight: 700; }
+.allow li.no { color: var(--muted); }
+.allow li.no::before { content: "\2716"; color: var(--off); }
 .meter { display: flex; gap: 3px; margin-top: 8px; }
 .meter i { display: block; height: 6px; flex: 1; max-width: 34px; border-radius: 1px; background: var(--line); }
 .meter i.on { background: var(--c); }
@@ -180,6 +186,22 @@ button, .btn {
   background-size: 24px 24px; background-position: 0 0, 12px 12px;
 }
 .map .empty span { background: var(--surface); padding: 8px 12px; border-radius: 4px; }
+
+/* ---------- evento del End ---------- */
+.end-box { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin-top: 12px; }
+.end-card { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 16px 18px; min-width: 0; }
+.end-card h3 { margin: 0 0 10px; font-size: 18px; }
+.end-nums { display: flex; flex-wrap: wrap; gap: 18px; }
+.end-nums div { min-width: 80px; }
+.end-nums b { display: block; font-family: var(--font-display); font-size: 30px; color: var(--end); line-height: 1.1; }
+.end-nums span { font-size: 14px; color: var(--muted); }
+.recipe { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.grid3 { display: grid; grid-template-columns: repeat(3, 44px); gap: 4px; }
+.grid3 span { width: 44px; height: 44px; display: grid; place-items: center; font-size: 11px; font-weight: 700; border-radius: 4px;
+  background: color-mix(in srgb, var(--fg) 8%, var(--surface)); border: 1px solid var(--line); color: var(--fg); }
+.grid3 img { width: 32px; height: 32px; image-rendering: pixelated; }
+.coords { list-style: none; margin: 0; padding: 0; font-family: var(--font-mono); font-size: 15px; display: grid; gap: 4px; }
+.end-note { color: var(--muted); font-size: 15px; margin-top: 10px; }
 
 /* ---------- pie ---------- */
 .foot .content { padding-block: 40px 56px; color: var(--muted); font-size: 14px; }
@@ -275,11 +297,11 @@ button, .btn {
       <h2 id="t-prank">Niveles de prank</h2>
       <p class="lead">Cada jugador elige hasta dónde le pueden hacer bromas. Su número aparece junto a su nombre en el chat y en el TAB. Elige el tuyo con <span class="cmd">/prank 1</span> a <span class="cmd">/prank 5</span>.</p>
       <ol class="scale">
-        <li class="lvl" style="--c: var(--p1)"><span class="n" aria-hidden="true">1</span><div><h3>Pacífico</h3><p>Solo bromas sanas: carteles, decoraciones, regalos raros. Nada se rompe ni se pierde.</p><div class="meter" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i><i></i></div></div></li>
-        <li class="lvl" style="--c: var(--p2)"><span class="n" aria-hidden="true">2</span><div><h3>Travieso</h3><p>Bromas leves y reversibles: mover o esconder cosas, tapar entradas, cambiar bloques decorativos.</p><div class="meter" aria-hidden="true"><i class="on"></i><i class="on"></i><i></i><i></i><i></i></div></div></li>
-        <li class="lvl" style="--c: var(--p3)"><span class="n" aria-hidden="true">3</span><div><h3>Molesto</h3><p>Bromas que molestan pero no destruyen: llenar de bloques o mobs, trampas que no matan. Sin explosiones.</p><div class="meter" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></div></div></li>
-        <li class="lvl" style="--c: var(--p4)"><span class="n" aria-hidden="true">4</span><div><h3>Peligroso</h3><p>Trampas que pueden matar y hacerte perder ítems. La base no se destruye.</p><div class="meter" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></div></div></li>
-        <li class="lvl" style="--c: var(--p5)"><span class="n" aria-hidden="true">5</span><div><h3>Caos</h3><p>Sin límites: explosiones, base destruida, todo vale.</p><div class="meter" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></div></div></li>
+        <li class="lvl" style="--c: var(--p1)"><span class="n" aria-hidden="true">1</span><div><h3>Nivel 1</h3><p>Bromas inofensivas. Nada se rompe, se mueve ni se pierde.</p><ul class="allow"><li>Poner carteles, cuadros, banderas o decoraciones en su base</li><li>Dejar regalos raros en sus cofres (tierra, semillas, flores…)</li><li>Construir cosas feas o graciosas cerca de su base, sin tocarla</li></ul><div class="meter" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i><i></i></div></div></li>
+        <li class="lvl" style="--c: var(--p2)"><span class="n" aria-hidden="true">2</span><div><h3>Nivel 2</h3><p>Todo lo anterior, más bromas reversibles.</p><ul class="allow"><li>Ordenar mal o esconder cosas dentro de su base (sin sacarlas)</li><li>Tapar entradas o ventanas con bloques fáciles de romper</li><li>Cambiar bloques decorativos (lana, flores, alfombras, vidrio)</li><li>Renombrar sus mascotas y animales</li></ul><div class="meter" aria-hidden="true"><i class="on"></i><i class="on"></i><i></i><i></i><i></i></div></div></li>
+        <li class="lvl" style="--c: var(--p3)"><span class="n" aria-hidden="true">3</span><div><h3>Nivel 3</h3><p>Todo lo anterior, más bromas molestas que no hacen daño.</p><ul class="allow"><li>Llenar su base de bloques (tierra, gravilla) o de animales</li><li>Trampas que no matan: agua, telarañas, caídas cortas, pistones</li><li>Redstone molesta: campanas, bloques musicales, luces</li><li class="no">Sin explosiones, fuego, lava ni mobs hostiles</li></ul><div class="meter" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></div></div></li>
+        <li class="lvl" style="--c: var(--p4)"><span class="n" aria-hidden="true">4</span><div><h3>Nivel 4</h3><p>Todo lo anterior, más trampas que pueden matar.</p><ul class="allow"><li>Trampas mortales: lava, caídas largas, TNT fuera de la base</li><li>Llevar mobs hostiles cerca de su base</li><li>Si muere, puede perder lo que llevaba encima</li><li class="no">La base no se destruye y no se roba de los cofres</li></ul><div class="meter" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></div></div></li>
+        <li class="lvl" style="--c: var(--p5)"><span class="n" aria-hidden="true">5</span><div><h3>Nivel 5</h3><p>Todo lo anterior, sin límites.</p><ul class="allow"><li>Explosiones y fuego, también dentro de la base</li><li>Romper construcciones</li><li>Robar o esconder ítems de sus cofres</li><li class="no">Nunca: hacks, dupes ilegales ni lag a propósito</li></ul><div class="meter" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></div></div></li>
       </ol>
       <div class="rule-min">
         <b>Entre dos jugadores vale el nivel más bajo.</b> Si tú eres 5 y la otra persona es 2, entre ustedes solo valen bromas de nivel 2. Revisa el de alguien con <span class="cmd">/prank nombre</span>. Subir de nivel es inmediato; bajar toma 24 horas.
@@ -294,12 +316,13 @@ button, .btn {
       <p class="eyebrow">Convivencia</p>
       <h2 id="t-reglas">Reglas</h2>
       <ol class="rules">
-        <li><div><b>Buena onda primero.</span></div></li>
+        <li><div><b>Buena onda primero.</b><span>Las bromas son bienvenidas; los insultos, el acoso y la discriminación no.</span></div></li>
         <li><div><b>Respeta los niveles de prank.</b><span>Entre dos jugadores vale el más bajo. Si no conoces el nivel de alguien, revísalo antes con /prank.</span></div></li>
         <li><div><b>Lo ajeno no se toca fuera del nivel acordado.</b><span>Robar o romper una base sin acuerdo es grifeo. Todo queda registrado y se puede revertir.</span></div></li>
         <li><div><b>Nada de hacks ni clientes con ventaja.</b><span>Prohibido xray, fly, kill aura, auto-clicker y radares de minerales o de entidades. Se permiten mods de rendimiento, shaders y minimapas sin radar.</span></div></li>
         <li><div><b>Granjas sí, lag no.</b><span>Las granjas técnicas y los dupers vanilla (TNT, rieles, alfombras) están permitidos. Las máquinas hechas para generar lag o botar el servidor, no.</span></div></li>
         <li><div><b>El spawn y la Ancient City son de todos.</b><span>No se destruyen: la Ancient City será la entrada a The Sift.</span></div></li>
+        <li><div><b>Una cuenta por persona.</b><span>Tu clave es tuya; no la compartas.</span></div></li>
         <li><div><b>Si tienes dudas o un problema, avisa a un admin en Discord.</b><span>Las decisiones de los admins se respetan.</span></div></li>
       </ol>
     </div>
@@ -318,6 +341,44 @@ button, .btn {
           <div class="empty" id="map-empty"><span>La primera foto aparece aquí el día del lanzamiento.</span></div>
           <figcaption>2.048 × 2.048 bloques alrededor del spawn · 1 píxel = 1 bloque</figcaption>
         </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- Y -56: el End (aparece cuando cae el primer Wither) -->
+  <section class="stratum" id="end" style="--band: var(--end)" aria-labelledby="t-end" hidden>
+    <div class="rail" aria-hidden="true"><div class="band"></div><span class="y">Y -56</span></div>
+    <div class="content">
+      <p class="eyebrow">Evento cooperativo</p>
+      <h2 id="t-end">Los Ojos Dormidos</h2>
+      <p class="lead" id="end-lead"></p>
+      <div class="end-box">
+        <div class="end-card">
+          <h3>Progreso del servidor</h3>
+          <div class="end-nums">
+            <div><b id="end-caidos">0</b><span>ojos caídos</span></div>
+            <div><b id="end-encontrados">0</b><span>encontrados</span></div>
+            <div><b id="end-despertados">0</b><span>despertados</span></div>
+          </div>
+          <p class="end-note">Hacen falta 12 ojos en el portal (algunos marcos ya traen uno), y cada ojo lanzado puede romperse.</p>
+        </div>
+        <div class="end-card">
+          <h3>Cómo despertarlos</h3>
+          <div class="recipe">
+            <div class="grid3" role="img" aria-label="Mesa de crafteo: perlas de ender en las esquinas, polvo de blaze a los lados y el Ojo Dormido al centro">
+              <span title="Perla de ender"><img src="perla-ender.png" alt=""></span><span title="Polvo de blaze"><img src="polvo-blaze.png" alt=""></span><span title="Perla de ender"><img src="perla-ender.png" alt=""></span>
+              <span title="Polvo de blaze"><img src="polvo-blaze.png" alt=""></span><span title="Ojo Dormido"><img src="ojo-dormido.png" alt=""></span><span title="Polvo de blaze"><img src="polvo-blaze.png" alt=""></span>
+              <span title="Perla de ender"><img src="perla-ender.png" alt=""></span><span title="Polvo de blaze"><img src="polvo-blaze.png" alt=""></span><span title="Perla de ender"><img src="perla-ender.png" alt=""></span>
+            </div>
+            <span aria-hidden="true">→ Ojo de Ender</span>
+          </div>
+          <p class="end-note">En el juego: <span class="cmd">/receta</span></p>
+        </div>
+        <div class="end-card" id="end-ojos-card">
+          <h3>Ojos esperando ser encontrados</h3>
+          <ul class="coords" id="end-ojos"></ul>
+          <p class="end-note">Busca la columna de luz morada. Brillan a través de las paredes.</p>
+        </div>
       </div>
     </div>
   </section>
@@ -354,6 +415,39 @@ button, .btn {
   // Foto del mapa (mapa.png junto a la pagina)
   var img = document.getElementById('map-img');
   img.addEventListener('load', function () { img.hidden = false; document.getElementById('map-empty').hidden = true; });
+
+  // Evento del End (end.json lo actualiza el servidor)
+  fetch('end.json?t=' + Date.now(), { cache: 'no-store' })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (e) {
+      if (!e || !e.fase || e.fase === 'bloqueado') return;
+      var sec = document.getElementById('end');
+      document.getElementById('end-caidos').textContent = e.caidos || 0;
+      document.getElementById('end-encontrados').textContent = e.encontrados || 0;
+      document.getElementById('end-despertados').textContent = e.despertados || 0;
+      var fecha = e.wither_fecha ? new Date(e.wither_fecha).toLocaleDateString('es-CL', { day: 'numeric', month: 'long' }) : '';
+      var quien = e.wither ? e.wither + ' derrotó al primer Wither' : 'Cayó el primer Wither';
+      var lead = document.getElementById('end-lead');
+      var ul = document.getElementById('end-ojos');
+      ul.textContent = '';
+      (e.ojos || []).forEach(function (o) {
+        var li = document.createElement('li');
+        li.textContent = 'X ' + o.x + ' · Z ' + o.z + '  (Y ' + o.y + ')';
+        ul.appendChild(li);
+      });
+      if (!(e.ojos || []).length) {
+        var li = document.createElement('li'); li.textContent = 'Ninguno por ahora: el próximo cae pronto.'; ul.appendChild(li);
+      }
+      if (e.fase === 'abierto') {
+        document.getElementById('t-end').textContent = 'El End está abierto';
+        lead.textContent = quien + (fecha ? ' el ' + fecha : '') + '. Los ojos despertaron y el portal se abrió: ya se pueden craftear ojos de ender normales.';
+        document.getElementById('end-ojos-card').hidden = true;
+      } else {
+        lead.textContent = quien + (fecha ? ' el ' + fecha : '') + ' y algo despertó en el mundo. Caen Ojos Dormidos en coordenadas anunciadas en el chat y en Discord. Los ojos de ender normales no se pueden craftear hasta que alguien cruce al End.';
+      }
+      sec.hidden = false;
+    })
+    .catch(function () {});
 
   // Estado en vivo (api publica mcsrvstat.us)
   var box = document.getElementById('status');
