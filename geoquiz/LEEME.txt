@@ -1,0 +1,24 @@
+GEOQUIZ — GeologyCraft
+======================
+
+Cómo subirlo
+  Sube la carpeta "geoquiz" completa a la raíz de tu sitio, para que quede en
+  https://geologycraft.lol/geoquiz/
+  Todo vive dentro de esa carpeta. No necesita base de datos, PHP ni cuentas.
+
+Cómo se juega
+  1. En el computador del proyector abre geologycraft.lol/geoquiz y pulsa "Crear partida".
+  2. Los jugadores escanean el QR (o entran a la página y escriben el PIN) y eligen un apodo.
+  3. Elige el nivel y pulsa "Comenzar". Enter o Espacio avanzan entre pantallas.
+  4. No cierres ni recargues la pestaña del presentador: ahí vive la partida.
+
+Editar preguntas
+  Todo está en preguntas.js. Cada pregunta tiene nivel, enunciado, respuesta
+  correcta, 3 alternativas incorrectas y una explicación.
+
+Archivos
+  index.html   la página
+  app.css      estilos
+  app.js       lógica del juego (presentador y jugadores)
+  preguntas.js banco de preguntas
+  vendor/      PeerJS (conexión en vivo) y qrcode-generator (QR), incluidos localmente
