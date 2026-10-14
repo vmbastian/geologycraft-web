@@ -135,6 +135,8 @@ button, .btn {
 .step p { font-size: 16px; margin-bottom: 8px; }
 .cmd { font-family: var(--font-mono); font-size: 14px; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 2px 6px; white-space: nowrap; }
 
+.step .cmd { white-space: normal; overflow-wrap: anywhere; display: inline; }
+
 /* ---------- escala de pranks ---------- */
 .scale { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 10px; }
 .lvl {
@@ -240,7 +242,7 @@ button, .btn {
           <code id="addr">geologycraft.lol</code>
           <button class="copy" id="copy" type="button">Copiar</button>
         </div>
-        <a class="btn discord" href="https://discord.gg/RxxBJwTwz" target="_blank" rel="noopener">Únete al Discord</a>
+        <a class="btn discord" href="https://geologycraft.lol/invite" target="_blank" rel="noopener">Únete al Discord</a>
       </div>
 
       <div class="status" id="status" data-state="unknown" aria-live="polite">
@@ -325,6 +327,38 @@ button, .btn {
         <li><div><b>Una cuenta por persona.</b><span>Tu clave es tuya; no la compartas.</span></div></li>
         <li><div><b>Si tienes dudas o un problema, avisa a un admin en Discord.</b><span>Las decisiones de los admins se respetan.</span></div></li>
       </ol>
+    </div>
+  </section>
+
+  <!-- Y -40: cuadros con imagenes (ImageFrame) -->
+  <section class="stratum" style="--band: var(--stone)" aria-labelledby="t-cuadros">
+    <div class="rail" aria-hidden="true"><div class="band"></div><span class="y">Y -40</span></div>
+    <div class="content">
+      <p class="eyebrow">Decoración</p>
+      <h2 id="t-cuadros">Cuadros con tus imágenes</h2>
+      <p class="lead">Puedes poner cualquier imagen, foto o GIF animado en marcos de la pared. Cada marco muestra un trozo, así que se arman murales del tamaño que quieras.</p>
+      <div class="steps">
+        <div class="step">
+          <h3>1. Arma la pared</h3>
+          <p>Pon marcos (item frames) formando un rectángulo, por ejemplo 3 de ancho por 2 de alto. Lleva un mapa vacío por cada marco.</p>
+        </div>
+        <div class="step">
+          <h3>2. Consigue el link</h3>
+          <p>Sube tu imagen a internet y copia el link <b>directo</b> a la imagen (clic derecho → <i>Copiar dirección de imagen</i>). Sirve PNG, JPG, WEBP o GIF.</p>
+        </div>
+        <div class="step">
+          <h3>3. Crea el cuadro</h3>
+          <p><span class="cmd">/imageframe create nombre link 3 2 combined</span></p>
+          <p>El 3 y el 2 son el ancho y el alto en marcos. Te llega un mapa especial.</p>
+        </div>
+        <div class="step">
+          <h3>4. Colócalo</h3>
+          <p>Haz clic derecho con ese mapa en el marco de <b>arriba a la izquierda</b>: la imagen se reparte sola en los demás.</p>
+        </div>
+      </div>
+      <div class="rule-min">
+        <b>Otros comandos:</b> <span class="cmd">/imageframe list</span> ver tus cuadros · <span class="cmd">/imageframe delete nombre</span> borrar uno. Las imágenes van con las reglas del server: nada que no mostrarías a todos.
+      </div>
     </div>
   </section>
 
