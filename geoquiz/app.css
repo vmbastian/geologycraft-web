@@ -74,7 +74,7 @@ input:focus{border-color:var(--accent);outline:none}
 .ans .mk{flex:none;width:44px;height:44px;border-radius:10px;background:rgba(0,0,0,.22);display:grid;place-items:center;font-family:var(--display);font-weight:800;font-size:22px}
 .ans .t{min-width:0;position:relative}
 .ans .n{margin-left:auto;font-family:var(--display);font-weight:800;font-size:28px;position:relative;font-variant-numeric:tabular-nums}
-.ans .fill{position:absolute;inset:0 auto 0 0;background:rgba(0,0,0,.18)}
+.ans .fill{position:absolute;inset:0 auto 0 0;width:var(--w,0);background:rgba(0,0,0,.2)}
 .a0{background:var(--magma)} .a1{background:var(--basalt)} .a2{background:var(--azufre);color:#24190a} .a3{background:var(--olivino)}
 .ans.dim{opacity:.28}
 .ans.right{outline:5px solid var(--fg);outline-offset:-5px}
@@ -90,11 +90,54 @@ input:focus{border-color:var(--accent);outline:none}
 .brow.top{background:var(--bg3)}
 .brow.top .pos{color:var(--accent)}
 .podium{display:flex;justify-content:center;align-items:flex-end;gap:14px;margin-top:20px}
-.podium div{flex:1;max-width:220px;display:flex;flex-direction:column;align-items:center;gap:8px;min-width:0}
+.podium > div{flex:1;max-width:220px;display:flex;flex-direction:column;align-items:center;gap:8px;min-width:0}
 .podium .nm{font-weight:700;font-size:20px;text-align:center;word-break:break-word}
 .podium .sc{color:var(--mute);font-variant-numeric:tabular-nums}
 .podium .step{width:100%;border-radius:12px 12px 0 0;display:grid;place-items:center;font-family:var(--display);font-weight:800;font-size:44px;color:#1b120b}
 .p1 .step{height:200px;background:var(--azufre)} .p2 .step{height:150px;background:#c9ccd3} .p3 .step{height:110px;background:#c47a45}
+
+/* animación de pregunta */
+.stage{display:flex;flex-direction:column;gap:20px;flex:1}
+.stage .qcard{transition:transform .5s cubic-bezier(.2,.8,.2,1);animation:drop .5s cubic-bezier(.2,.8,.2,1) both}
+.stage.intro .qcard{transform:scale(1.04)}
+.stage .clock{transition:opacity .3s}
+.stage.intro .clock,.stage.intro #skip,.stage.intro .counter{opacity:0}
+.stage .grid .ans{transition:opacity .35s ease-out,transform .45s cubic-bezier(.2,.9,.3,1.3);transition-delay:var(--d,0ms)}
+.stage.intro .grid .ans{opacity:0;transform:translateY(22px) scale(.96)}
+.counter.bump{animation:bump .35s ease-out}
+@keyframes drop{from{opacity:0;transform:translateY(-18px)}}
+@keyframes bump{40%{transform:scale(1.25);color:var(--accent)}}
+
+/* revelación */
+.reveal .ans.wrong{animation:fadeWrong .6s ease-out .25s both}
+.reveal .ans.right{animation:pulse .7s ease-out .25s both}
+.reveal .fill{animation:grow 1s cubic-bezier(.2,.8,.2,1) .45s both}
+.reveal .explain{animation:drop .5s ease-out .7s both}
+@keyframes fadeWrong{to{opacity:.3}}
+@keyframes pulse{0%{transform:scale(1)}40%{transform:scale(1.035)}100%{transform:scale(1)}}
+@keyframes grow{from{width:0}}
+
+/* avance automático */
+.autoctl{display:grid;gap:10px;margin-top:auto}
+.autotrack{height:4px;background:var(--bg2);border-radius:4px;overflow:hidden}
+.autotrack i{display:block;height:100%;width:0;background:var(--mute)}
+.check{display:flex;gap:8px;align-items:center;color:var(--mute);cursor:pointer}
+select{background:var(--bg3);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:5px 8px;font:inherit;margin-left:6px}
+
+/* ranking animado */
+.btitle{animation:drop .5s ease-out both}
+.brows{position:relative}
+.brows .brow{position:absolute;left:0;right:0;height:64px;transition:transform .95s cubic-bezier(.25,.9,.25,1),opacity .5s ease-out}
+.brow .sc{font-variant-numeric:tabular-nums;min-width:90px;text-align:right}
+.brow .gain{font-size:15px;color:var(--ok);opacity:0}
+.brow.moved .gain{animation:gain 1.4s ease-out .2s both}
+.brow .streak{font-size:16px}
+.brow.static{animation:drop .4s ease-out 3.6s both}
+@keyframes gain{0%{opacity:0;transform:translateY(8px)}25%{opacity:1;transform:none}100%{opacity:1}}
+.podium .step{animation:rise .9s cubic-bezier(.2,.9,.3,1.15) var(--d) both;transform-origin:bottom}
+.podium .nm,.podium .sc{animation:drop .5s ease-out calc(var(--d) + .7s) both}
+@keyframes rise{from{transform:scaleY(0)}}
+.confetti{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:10}
 
 /* jugador */
 .player{max-width:560px;width:100%;margin:0 auto;flex:1;display:flex;flex-direction:column;gap:16px}
@@ -108,4 +151,15 @@ input:focus{border-color:var(--accent);outline:none}
 .spin{width:44px;height:44px;border-radius:50%;border:5px solid var(--bg3);border-top-color:var(--accent);animation:sp 1s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
 .err{color:var(--bad);font-weight:700}
+.pop{animation:popin .45s cubic-bezier(.2,.9,.3,1.4) both}
+@keyframes popin{from{opacity:0;transform:scale(.6)}}
+.count{font-family:var(--display);font-weight:800;font-size:120px;line-height:1;color:var(--accent)}
+.qtext{font-size:22px;font-weight:700;max-width:30ch}
+.qsmall{font-weight:700;margin:0}
+.pgrid .ans{animation:popin .35s cubic-bezier(.2,.9,.3,1.3) var(--d,0ms) both}
+.pgrid .ans.chosen{transform:scale(1.03)}
+.pgrid .ans.dim{opacity:.25}
+.sentmark{width:96px;height:96px;border-radius:22px;display:grid;place-items:center;font-family:var(--display);font-weight:800;font-size:48px;color:#fff}
+.up{color:var(--ok);font-weight:700;font-size:20px}
+.down{color:var(--bad);font-weight:700;font-size:20px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}

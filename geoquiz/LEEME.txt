@@ -1,24 +1,44 @@
-GEOQUIZ — GeologyCraft
-======================
+GEOQUIZ — GeologyCraft (versión Firebase)
+=========================================
 
-Cómo subirlo
-  Sube la carpeta "geoquiz" completa a la raíz de tu sitio, para que quede en
-  https://geologycraft.lol/geoquiz/
-  Todo vive dentro de esa carpeta. No necesita base de datos, PHP ni cuentas.
+A) CONFIGURAR FIREBASE (una sola vez, ~5 minutos, gratis)
+  1. Entra a https://console.firebase.google.com con tu cuenta de Google y crea un proyecto
+     (por ejemplo "geoquiz"). Google Analytics no hace falta.
+  2. Authentication → Comenzar → Sign-in method → activa "Anónimo".
+  3. Authentication → Configuración → Dominios autorizados → agrega geologycraft.lol
+  4. Realtime Database → Crear base de datos → ubicación "Estados Unidos (us-central1)"
+     → empezar en modo bloqueado.
+  5. Realtime Database → pestaña Reglas → borra todo, pega el contenido de
+     reglas-firebase.json y pulsa Publicar.
+  6. ⚙ Configuración del proyecto → General → Tus apps → ícono web (</>) → registra la app
+     (sin Hosting). Copia los valores de "firebaseConfig" (apiKey, authDomain, databaseURL,
+     projectId, appId) dentro de firebase-config.js.
+     Si no aparece databaseURL, cópiala desde la parte de arriba de Realtime Database.
 
-Cómo se juega
-  1. En el computador del proyector abre geologycraft.lol/geoquiz y pulsa "Crear partida".
-  2. Los jugadores escanean el QR (o entran a la página y escriben el PIN) y eligen un apodo.
-  3. Elige el nivel y pulsa "Comenzar". Enter o Espacio avanzan entre pantallas.
-  4. No cierres ni recargues la pestaña del presentador: ahí vive la partida.
+B) SUBIRLO AL SITIO
+  Sube la carpeta "geoquiz" completa a la raíz del repositorio geologycraft-web
+  (junto a discord/ e invite/). Queda en https://geologycraft.lol/geoquiz/
 
-Editar preguntas
-  Todo está en preguntas.js. Cada pregunta tiene nivel, enunciado, respuesta
-  correcta, 3 alternativas incorrectas y una explicación.
+C) CÓMO SE JUEGA
+  1. En el computador del proyector abre geologycraft.lol/geoquiz → "Crear partida".
+  2. Los jugadores escanean el QR (o escriben el PIN) y eligen un apodo.
+  3. Elige el nivel, si quieres que avance solo y cuántos segundos mostrar
+     la respuesta y el ranking. Pulsa "Comenzar".
+  4. Cada pregunta se muestra 3 s antes de abrir las alternativas. Cuando responden
+     todos los conectados (o se acaba el tiempo) pasa sola a la respuesta, luego al
+     ranking animado y luego a la siguiente pregunta.
+  Teclado del presentador: Espacio = pausar/continuar, Enter o → = avanzar ya.
+  Si se cae o recargas la pestaña del presentador, al volver a "Crear partida"
+  aparece la opción "Retomar".
+
+D) EDITAR PREGUNTAS
+  Todo está en preguntas.js. Cada pregunta tiene nivel, enunciado, respuesta correcta,
+  3 alternativas incorrectas y una explicación.
 
 Archivos
-  index.html   la página
-  app.css      estilos
-  app.js       lógica del juego (presentador y jugadores)
-  preguntas.js banco de preguntas
-  vendor/      PeerJS (conexión en vivo) y qrcode-generator (QR), incluidos localmente
+  index.html            la página
+  app.css / app.js      estilos y lógica (presentador y jugadores)
+  preguntas.js          banco de preguntas
+  firebase-config.js    datos de tu proyecto de Firebase (rellenar)
+  reglas-firebase.json  reglas de seguridad para pegar en Realtime Database
+  vendor/               Firebase y generador de QR, incluidos localmente

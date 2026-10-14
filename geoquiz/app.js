@@ -1,28 +1,90 @@
-/* Geoquiz en vivo — GeologyCraft
- * El computador del presentador hace de "servidor": los celulares se conectan
- * directo a él por WebRTC (PeerJS). No hay base de datos ni cuentas.
- * Si se cierra o recarga la pestaña del presentador, la partida se pierde.
+/* Geoquiz en vivo — GeologyCraft (versión Firebase)
+ * La partida vive en Firebase Realtime Database:
+ *   games/<pin>/host                → uid del presentador
+ *   games/<pin>/state               → fase actual (lobby, q, reveal, board, end) y la pregunta en juego
+ *   games/<pin>/players/<uid>       → apodo y si está conectado (lo escribe cada jugador)
+ *   games/<pin>/answers/<i>/<uid>   → respuesta del jugador a la pregunta i, con hora del servidor
+ *   games/<pin>/scores/<uid>        → puntaje y último resultado (lo escribe el presentador)
+ * Las respuestas correctas solo se publican al revelar cada pregunta.
  */
 (function () {
   "use strict";
 
-  const PREFIX = "geologycraft-geoquiz-";          // evita choques de PIN en el servidor público de PeerJS
   const LV = { facil: { n: "Fácil", t: 20 }, intermedia: { n: "Intermedia", t: 25 }, dificil: { n: "Difícil", t: 30 } };
   const MK = ["A", "B", "C", "D"];
+  const INTRO_MS = 3000;          // tiempo para leer la pregunta antes de que aparezcan las alternativas
   const Q = window.PREGUNTAS || [];
   const app = document.getElementById("app");
   const params = new URLSearchParams(location.search);
+  const reduced = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const shuffle = a => { a = [...a]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
   const fmt = n => Number(n || 0).toLocaleString("es-CL");
   const store = {
-    get(k) { try { return localStorage.getItem("geoquiz:" + k); } catch (e) { return null; } },
-    set(k, v) { try { localStorage.setItem("geoquiz:" + k, v); } catch (e) {} }
+    get(k) { try { return JSON.parse(localStorage.getItem("geoquiz:" + k)); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem("geoquiz:" + k, JSON.stringify(v)); } catch (e) {} },
+    del(k) { try { localStorage.removeItem("geoquiz:" + k); } catch (e) {} }
   };
-  const rid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
-  const peerOpts = { debug: 1, config: { iceServers: [{ urls: "stun:stun.l.google.com:19302" }, { urls: "stun:stun1.l.google.com:19302" }] } };
   const joinUrl = pin => location.origin + location.pathname + "?pin=" + pin;
+  // Firebase puede devolver listas como objetos {0:…,1:…}; esto las normaliza
+  const arr = v => Array.isArray(v) ? v : (v && typeof v === "object" ? Object.keys(v).sort((a, b) => a - b).map(k => v[k]) : []);
+  const center = html => `<div class="center">${html}</div>`;
+  const spinner = text => center(`<div class="spin"></div><p class="muted">${text}</p>`);
+
+  /* ------------------------------------------------------------ Firebase */
+  const cfg = window.FIREBASE_CONFIG;
+  if (!cfg || !cfg.apiKey || /PEGAR/.test(cfg.apiKey + cfg.databaseURL)) {
+    app.innerHTML = `<section class="hero"><div class="label">Geoquiz · Falta configurar</div><h1 style="font-size:48px">Falta conectar Firebase</h1>
+      <p class="muted">Pega la configuración de tu proyecto en <b>firebase-config.js</b> y sube el archivo de nuevo. Los pasos están en LEEME.txt.</p></section>`;
+    return;
+  }
+  if (typeof firebase === "undefined") { app.innerHTML = `<p class="err">No se pudieron cargar las librerías de Firebase (carpeta vendor).</p>`; return; }
+  firebase.initializeApp(cfg);
+  const auth = firebase.auth(), db = firebase.database(), TS = firebase.database.ServerValue.TIMESTAMP;
+  let offset = 0;
+  db.ref(".info/serverTimeOffset").on("value", s => { offset = s.val() || 0; });
+  const now = () => Date.now() + offset;
+  let UID = null;
+
+  function signIn() {
+    return new Promise((resolve, reject) => {
+      const off = auth.onAuthStateChanged(u => {
+        if (u) { off(); UID = u.uid; resolve(u); }
+        else auth.signInAnonymously().catch(e => { off(); reject(e); });
+      });
+    });
+  }
+  function fatal(e) {
+    console.error(e);
+    const code = (e && e.code) || "error";
+    const hint = /operation-not-allowed|admin-restricted/.test(code) ? "Activa el inicio de sesión Anónimo en Firebase → Authentication → Sign-in method."
+      : /permission/.test(code) ? "Revisa que las reglas de la base de datos sean las de reglas-firebase.json."
+      : "Revisa la conexión a internet y vuelve a intentar.";
+    app.innerHTML = center(`<p class="err">Algo falló (${esc(code)}).</p><p class="muted" style="max-width:46ch">${hint}</p><button class="go" onclick="location.reload()">Reintentar</button>`);
+  }
+
+  /* ------------------------------------------------------------ confeti */
+  function confetti(ms) {
+    if (reduced) return;
+    const c = document.createElement("canvas"); c.className = "confetti"; document.body.appendChild(c);
+    const x = c.getContext("2d"); let W, Hh;
+    const size = () => { W = c.width = innerWidth * devicePixelRatio; Hh = c.height = innerHeight * devicePixelRatio; };
+    size(); addEventListener("resize", size);
+    const cols = ["#d9482b", "#3a6fb0", "#d8a91c", "#4f9a4a", "#f08a3c", "#f1efe9"];
+    const P = Array.from({ length: 160 }, () => ({ x: Math.random() * W, y: -Math.random() * Hh * .6, vx: (Math.random() - .5) * 3, vy: 2 + Math.random() * 4, r: Math.random() * 6.3, vr: (Math.random() - .5) * .3, s: (6 + Math.random() * 8) * devicePixelRatio, c: cols[Math.floor(Math.random() * cols.length)] }));
+    const t0 = performance.now();
+    (function f(t) {
+      x.clearRect(0, 0, W, Hh);
+      for (const p of P) { p.x += p.vx; p.y += p.vy * devicePixelRatio; p.vy += .03; p.r += p.vr; x.save(); x.translate(p.x, p.y); x.rotate(p.r); x.fillStyle = p.c; x.fillRect(-p.s / 2, -p.s / 4, p.s, p.s / 2); x.restore(); }
+      if (t - t0 < ms) requestAnimationFrame(f); else { removeEventListener("resize", size); c.remove(); }
+    })(t0);
+  }
+  function countUp(el, from, to, ms) {
+    if (reduced || from === to) { el.textContent = fmt(to); return; }
+    const t0 = performance.now();
+    (function f(t) { const k = Math.min(1, (t - t0) / ms), e = 1 - Math.pow(1 - k, 3); el.textContent = fmt(Math.round(from + (to - from) * e)); if (k < 1) requestAnimationFrame(f); })(t0);
+  }
 
   /* ------------------------------------------------------------ PORTADA */
   function home() {
@@ -45,103 +107,92 @@
         </div>
       </div>
     </section>`;
-    app.querySelector("#host").onclick = host;
+    app.querySelector("#host").onclick = hostEntry;
     const go = () => { const p = app.querySelector("#pin").value.replace(/\D/g, ""); if (p.length === 6) location.search = "?pin=" + p; };
     app.querySelector("#join").onclick = go;
     app.querySelector("#pin").onkeydown = e => { if (e.key === "Enter") go(); };
   }
 
   /* ============================================================ PRESENTADOR */
-  const H = { peer: null, pin: "", players: new Map(), sel: "todas", mix: true, deck: [], i: 0, phase: "lobby", t0: 0, T: 0, timer: null, wake: null };
+  const H = {
+    pin: "", ref: null, deck: [], i: 0, phase: "lobby",
+    set: Object.assign({ sel: "todas", mix: true, auto: true, reveal: 3, board: 5 }, store.get("settings") || {}),
+    players: {}, scores: {}, answers: {}, ansRef: null,
+    startAt: 0, deadline: 0, T: 0, opened: false, allAt: 0,
+    due: null, dueFn: null, dueTotal: 0, paused: false, pausedLeft: 0,
+    boardData: [], ticker: null
+  };
 
-  function host() {
-    if (typeof Peer === "undefined") { app.innerHTML = `<p class="err">No se pudo cargar la librería de conexión (vendor/peerjs.min.js).</p>`; return; }
-    app.innerHTML = `<div class="center"><div class="spin"></div><p class="muted">Creando la partida…</p></div>`;
-    openHostPeer(0);
-    try { navigator.wakeLock && navigator.wakeLock.request("screen").then(w => H.wake = w).catch(() => {}); } catch (e) {}
-    window.addEventListener("beforeunload", e => { if (H.players.size && H.phase !== "end") { e.preventDefault(); e.returnValue = ""; } });
-  }
-
-  function openHostPeer(tries) {
-    H.pin = String(Math.floor(100000 + Math.random() * 900000));
-    const peer = new Peer(PREFIX + H.pin, peerOpts);
-    H.peer = peer;
-    peer.on("open", () => lobby());
-    peer.on("connection", conn => wire(conn));
-    peer.on("disconnected", () => { setTimeout(() => { if (!peer.destroyed) peer.reconnect(); }, 1500); });
-    peer.on("error", err => {
-      if (err.type === "unavailable-id" && tries < 5) { peer.destroy(); openHostPeer(tries + 1); return; }
-      if (err.type === "peer-unavailable") return;
-      if (H.phase === "lobby" && !H.players.size) {
-        app.innerHTML = `<div class="center"><p class="err">No se pudo crear la partida (${esc(err.type || "error")}).</p><p class="muted">Revisa la conexión a internet y vuelve a intentar.</p><button class="go" onclick="location.reload()">Reintentar</button></div>`;
-      }
-      console.warn("PeerJS:", err);
-    });
-  }
-
-  function wire(conn) {
-    conn.on("data", d => onHostData(conn, d));
-    conn.on("close", () => {
-      for (const p of H.players.values()) if (p.conn === conn) { p.online = false; p.conn = null; }
-      refreshLive();
-    });
-  }
-
-  function send(p, msg) { if (p.conn && p.conn.open) { try { p.conn.send(msg); } catch (e) {} } }
-
-  function onHostData(conn, d) {
-    if (!d || typeof d !== "object") return;
-    if (d.t === "join") {
-      const pid = String(d.pid || "").slice(0, 40);
-      if (!pid) return;
-      let p = H.players.get(pid);
-      if (!p) {
-        let nick = String(d.nick || "").replace(/\s+/g, " ").trim().slice(0, 18) || "Jugador";
-        const taken = new Set([...H.players.values()].map(x => x.nick.toLowerCase()));
-        let n = 2, base = nick; while (taken.has(nick.toLowerCase())) nick = base + " " + n++;
-        p = { pid, nick, score: 0, streak: 0, ok: 0, ans: null, last: null, conn: null, online: true };
-        H.players.set(pid, p);
-      }
-      if (p.conn && p.conn !== conn) { try { p.conn.close(); } catch (e) {} }
-      p.conn = conn; p.online = true;
-      syncPlayer(p);
-      refreshLive();
-      return;
+  async function hostEntry() {
+    app.innerHTML = spinner("Conectando…");
+    try { await signIn(); } catch (e) { return fatal(e); }
+    const active = store.get("activePin");
+    if (active) {
+      try {
+        const snap = await db.ref("games/" + active).once("value");
+        const g = snap.val();
+        if (g && g.host === UID && g.state && g.state.phase !== "end" && store.get("host:" + active)) {
+          app.innerHTML = center(`<div class="label">Partida en curso</div><div class="pin">${active.slice(0, 3)} ${active.slice(3)}</div>
+            <p class="muted">Tienes una partida sin terminar en este computador.</p>
+            <div class="row" style="justify-content:center"><button class="go" id="resume">Retomar</button><button class="ghost" id="fresh">Crear una nueva</button></div>`);
+          app.querySelector("#resume").onclick = () => resume(active, g);
+          app.querySelector("#fresh").onclick = () => { db.ref("games/" + active).remove().catch(() => {}); store.del("host:" + active); store.del("activePin"); createGame(); };
+          return;
+        }
+      } catch (e) {}
     }
-    const p = [...H.players.values()].find(x => x.conn === conn);
-    if (!p) return;
-    if (d.t === "ans" && H.phase === "q" && d.i === H.i && p.ans === null) {
-      const k = Number(d.k);
-      if (!(k >= 0 && k < 4)) return;
-      const left = Math.max(0, H.T - (performance.now() - H.t0) / 1000);
-      if (left <= 0) return;
-      p.ans = { k, left };
-      send(p, { t: "got" });
-      refreshLive();
-      const online = [...H.players.values()].filter(x => x.online);
-      if (online.length && online.every(x => x.ans !== null)) setTimeout(reveal, 600);
+    createGame();
+  }
+
+  async function createGame() {
+    app.innerHTML = spinner("Creando la partida…");
+    for (let n = 0; n < 6; n++) {
+      const pin = String(Math.floor(100000 + Math.random() * 900000));
+      try {
+        const res = await db.ref("games/" + pin).transaction(cur => cur === null ? { host: UID, created: Date.now(), state: { phase: "lobby" } } : undefined);
+        if (res.committed) { startHosting(pin); lobby(); return; }
+      } catch (e) { return fatal(e); }
     }
+    fatal({ code: "sin-pin-libre" });
   }
 
-  function syncPlayer(p) {
-    const x = H.deck[H.i];
-    if (H.phase === "lobby") send(p, { t: "lobby", nick: p.nick });
-    else if (H.phase === "q") send(p, { t: "q", i: H.i, n: H.deck.length, l: x.l, opts: x.opts, q: x.q, remain: Math.max(0, H.T * 1000 - (performance.now() - H.t0)), answered: p.ans !== null, nick: p.nick });
-    else if (H.phase === "end") send(p, { t: "end", ...standing(p) });
-    else if (p.last) send(p, { t: "res", ...p.last, ...standing(p) });
-    else send(p, { t: "wait", nick: p.nick });
+  function startHosting(pin) {
+    H.pin = pin; H.ref = db.ref("games/" + pin);
+    store.set("activePin", pin);
+    H.ref.child("players").on("value", s => { H.players = s.val() || {}; refreshLive(); }, fatal);
+    try { navigator.wakeLock && navigator.wakeLock.request("screen").catch(() => {}); } catch (e) {}
+    clearInterval(H.ticker); H.ticker = setInterval(tick, 100);
   }
 
-  function ranking() { return [...H.players.values()].sort((a, b) => b.score - a.score || b.ok - a.ok); }
-  function standing(p) { const r = ranking(); return { rank: r.indexOf(p) + 1, of: r.length, score: p.score, nick: p.nick }; }
+  async function resume(pin, g) {
+    startHosting(pin);
+    const saved = store.get("host:" + pin);
+    H.deck = saved.deck || []; H.i = saved.i || 0; Object.assign(H.set, saved.set || {});
+    H.scores = g.scores || {};
+    const ph = g.state.phase;
+    if (ph === "lobby" || !H.deck.length) return lobby();
+    if (ph === "q") { await H.ref.child("answers/" + H.i).remove(); return ask(); }
+    if (H.i >= H.deck.length - 1) return finish();
+    H.i++; ask();
+  }
 
+  function saveLocal() { store.set("host:" + H.pin, { deck: H.deck, i: H.i, set: H.set }); store.set("settings", H.set); }
+  const nickOf = uid => (H.players[uid] && H.players[uid].nick) || "Jugador";
+  const onlineUids = () => Object.keys(H.players).filter(u => H.players[u].online);
+  function ranking() {
+    const ids = new Set([...Object.keys(H.players), ...Object.keys(H.scores)]);
+    return [...ids].map(uid => ({ uid, nick: nickOf(uid), score: (H.scores[uid] || {}).score || 0, ok: (H.scores[uid] || {}).ok || 0, streak: (H.scores[uid] || {}).streak || 0 }))
+      .sort((a, b) => b.score - a.score || b.ok - a.ok || a.nick.localeCompare(b.nick));
+  }
+
+  /* ---- lobby */
   function lobby() {
-    H.phase = "lobby";
+    H.phase = "lobby"; cancelDue();
     const counts = { todas: Q.length }; Q.forEach(x => counts[x.l] = (counts[x.l] || 0) + 1);
-    const chip = (k, n) => `<button class="chip" data-k="${k}" aria-pressed="${H.sel === k}">${n}<small>${counts[k] || 0}</small></button>`;
-    const url = joinUrl(H.pin);
+    const chip = (k, n) => `<button class="chip" data-k="${k}" aria-pressed="${H.set.sel === k}">${n}<small>${counts[k] || 0}</small></button>`;
+    const secs = (id, val, opts) => `<select id="${id}">${opts.map(o => `<option value="${o}" ${o == val ? "selected" : ""}>${o} s</option>`).join("")}</select>`;
     let qrImg = "";
-    try { const qr = qrcode(0, "M"); qr.addData(url); qr.make(); qrImg = qr.createImgTag(10, 0); } catch (e) { qrImg = `<p style="color:#17181c">No se pudo generar el QR</p>`; }
+    try { const qr = qrcode(0, "M"); qr.addData(joinUrl(H.pin)); qr.make(); qrImg = qr.createImgTag(10, 0); } catch (e) { qrImg = `<p style="color:#17181c">No se pudo generar el QR</p>`; }
     app.innerHTML = `
     <div class="lobby">
       <div class="qrbox">${qrImg}</div>
@@ -153,13 +204,21 @@
         <div class="setup">
           <div class="label">Preguntas</div>
           <div class="row" id="lv">${chip("todas", "Todas")}${chip("facil", "Fáciles")}${chip("intermedia", "Intermedias")}${chip("dificil", "Difíciles")}</div>
-          <label class="row" style="gap:8px;cursor:pointer"><input type="checkbox" id="mix" ${H.mix ? "checked" : ""}> <span class="muted">Mezclar el orden</span></label>
+          <label class="check"><input type="checkbox" id="mix" ${H.set.mix ? "checked" : ""}> Mezclar el orden</label>
+          <label class="check"><input type="checkbox" id="auto" ${H.set.auto ? "checked" : ""}> Avanzar solo</label>
+          <div class="row muted" id="autoopts" ${H.set.auto ? "" : "hidden"}>
+            <label>Respuesta en pantalla ${secs("rv", H.set.reveal, [3, 5, 8, 12])}</label>
+            <label>Ranking ${secs("bd", H.set.board, [3, 5, 8])}</label>
+          </div>
         </div>
-        <div class="row"><button class="go" id="start" disabled>Comenzar</button><span class="muted">Mantén esta pestaña abierta durante todo el juego.</span></div>
+        <div class="row"><button class="go" id="start" disabled>Comenzar</button><span class="muted">Mantén esta pestaña abierta durante el juego.</span></div>
       </div>
     </div>`;
-    app.querySelectorAll("#lv .chip").forEach(b => b.onclick = () => { H.sel = b.dataset.k; app.querySelectorAll("#lv .chip").forEach(c => c.setAttribute("aria-pressed", c === b)); });
-    app.querySelector("#mix").onchange = e => H.mix = e.target.checked;
+    app.querySelectorAll("#lv .chip").forEach(b => b.onclick = () => { H.set.sel = b.dataset.k; app.querySelectorAll("#lv .chip").forEach(c => c.setAttribute("aria-pressed", c === b)); });
+    app.querySelector("#mix").onchange = e => H.set.mix = e.target.checked;
+    app.querySelector("#auto").onchange = e => { H.set.auto = e.target.checked; app.querySelector("#autoopts").hidden = !H.set.auto; };
+    app.querySelector("#rv").onchange = e => H.set.reveal = +e.target.value;
+    app.querySelector("#bd").onchange = e => H.set.board = +e.target.value;
     app.querySelector("#start").onclick = startGame;
     refreshLive();
   }
@@ -167,123 +226,238 @@
   function refreshLive() {
     if (H.phase === "lobby") {
       const list = app.querySelector("#plist"); if (!list) return;
-      const ps = [...H.players.values()];
-      app.querySelector("#pcount").textContent = `Jugadores (${ps.filter(p => p.online).length})`;
-      list.innerHTML = ps.map(p => `<span class="${p.online ? "" : "off"}">${esc(p.nick)}</span>`).join("") || `<span class="muted" style="background:none;padding:7px 0">Esperando jugadores…</span>`;
-      app.querySelector("#start").disabled = !ps.some(p => p.online);
-    } else if (H.phase === "q") {
-      const c = app.querySelector("#answered"); if (!c) return;
-      const ps = [...H.players.values()];
-      c.innerHTML = `${ps.filter(p => p.ans !== null).length}<small>de ${ps.filter(p => p.online || p.ans !== null).length} respuestas</small>`;
-    }
+      const ids = Object.keys(H.players).sort((a, b) => (H.players[a].joinedAt || 0) - (H.players[b].joinedAt || 0));
+      const on = ids.filter(u => H.players[u].online);
+      app.querySelector("#pcount").textContent = `Jugadores (${on.length})`;
+      const have = new Set([...list.querySelectorAll("[data-u]")].map(e => e.dataset.u));
+      if (!ids.length) list.innerHTML = `<span class="muted" style="background:none;padding:7px 0">Esperando jugadores…</span>`;
+      else {
+        if (!have.size) list.innerHTML = "";
+        for (const u of ids) {
+          let el = list.querySelector(`[data-u="${u}"]`);
+          if (!el) { el = document.createElement("span"); el.dataset.u = u; list.appendChild(el); }
+          el.textContent = nickOf(u); el.classList.toggle("off", !H.players[u].online);
+        }
+        list.querySelectorAll("[data-u]").forEach(e => { if (!H.players[e.dataset.u]) e.remove(); });
+      }
+      app.querySelector("#start").disabled = !on.length;
+    } else if (H.phase === "q") updateCounter();
   }
 
-  function startGame() {
-    let d = Q.filter(x => H.sel === "todas" || x.l === H.sel);
-    if (H.mix) d = shuffle(d);
-    H.deck = d.map(x => ({ ...x, opts: shuffle([x.a, ...x.w]) }));
-    for (const p of H.players.values()) Object.assign(p, { score: 0, streak: 0, ok: 0, ans: null, last: null });
-    H.i = 0;
+  async function startGame() {
+    let d = Q.filter(x => H.set.sel === "todas" || x.l === H.set.sel);
+    if (H.set.mix) d = shuffle(d);
+    H.deck = d.map(x => { const opts = shuffle([x.a, ...x.w]); return { q: x.q, l: x.l, e: x.e, opts, c: opts.indexOf(x.a) }; });
+    H.i = 0; H.scores = {};
+    await H.ref.update({ scores: null, answers: null });
     ask();
   }
 
+  /* ---- pregunta */
   function ask() {
+    cancelDue();
     const x = H.deck[H.i];
-    H.phase = "q"; H.T = LV[x.l].t; H.t0 = performance.now();
-    for (const p of H.players.values()) p.ans = null;
+    H.phase = "q"; H.T = LV[x.l].t; H.opened = false; H.allAt = 0; H.answers = {};
+    H.startAt = now() + INTRO_MS; H.deadline = H.startAt + H.T * 1000;
+    saveLocal();
+    if (H.ansRef) H.ansRef.off();
+    H.ansRef = H.ref.child("answers/" + H.i);
+    H.ansRef.on("value", s => { H.answers = s.val() || {}; updateCounter(); });
+    H.ref.child("state").set({ phase: "q", i: H.i, n: H.deck.length, l: x.l, q: x.q, opts: x.opts, T: H.T, startAt: H.startAt, deadline: H.deadline }).catch(fatal);
     app.innerHTML = `
-    <div class="hud">
-      <span class="pill">Pregunta ${H.i + 1} de ${H.deck.length}</span>
-      <span class="pill lvl-${x.l}">${LV[x.l].n}</span>
-      <span class="pill">PIN ${H.pin}</span>
-    </div>
-    <div class="qcard"><h2>${esc(x.q)}</h2><div class="clock" id="clk">${H.T}</div></div>
-    <div class="bar"><i id="bar"></i></div>
-    <div class="grid">${x.opts.map((o, k) => `<div class="ans a${k}"><span class="mk">${MK[k]}</span><span class="t">${esc(o)}</span></div>`).join("")}</div>
-    <div class="foot" style="align-items:center;justify-content:space-between">
-      <div class="counter" id="answered"></div>
-      <button class="ghost" id="skip">Cerrar respuestas</button>
+    <div class="stage intro" id="stage">
+      <div class="hud">
+        <span class="pill">Pregunta ${H.i + 1} de ${H.deck.length}</span>
+        <span class="pill lvl-${x.l}">${LV[x.l].n}</span>
+        <span class="pill">PIN ${H.pin}</span>
+      </div>
+      <div class="qcard"><h2>${esc(x.q)}</h2><div class="clock" id="clk">${H.T}</div></div>
+      <div class="bar"><i id="bar"></i></div>
+      <div class="grid" id="opts">${x.opts.map((o, k) => `<div class="ans a${k}" style="--d:${k * 90}ms"><span class="mk">${MK[k]}</span><span class="t">${esc(o)}</span></div>`).join("")}</div>
+      <div class="foot" style="align-items:center;justify-content:space-between">
+        <div class="counter" id="answered"></div>
+        <button class="ghost" id="skip">Cerrar respuestas</button>
+      </div>
     </div>`;
-    app.querySelector("#skip").onclick = reveal;
-    for (const p of H.players.values()) syncPlayer(p);
-    refreshLive();
-    const bar = app.querySelector("#bar"), clk = app.querySelector("#clk");
-    clearInterval(H.timer);
-    H.timer = setInterval(() => {
-      const left = Math.max(0, H.T - (performance.now() - H.t0) / 1000);
-      bar.style.width = (left / H.T * 100) + "%";
-      clk.textContent = Math.ceil(left); clk.classList.toggle("low", left <= 5);
-      if (left <= 0) reveal();
-    }, 100);
+    app.querySelector("#skip").onclick = closeQ;
+    updateCounter();
   }
 
-  function reveal() {
-    if (H.phase !== "q") return;
-    clearInterval(H.timer);
-    H.phase = "reveal";
-    const x = H.deck[H.i], counts = [0, 0, 0, 0];
-    for (const p of H.players.values()) {
-      const a = p.ans, good = !!a && x.opts[a.k] === x.a;
-      if (a) counts[a.k]++;
-      let pts = 0;
-      if (good) { p.streak++; p.ok++; pts = Math.round(500 + 500 * (a.left / H.T)) + Math.min(p.streak - 1, 5) * 100; p.score += pts; }
-      else p.streak = 0;
-      p.last = { good, pts, answered: !!a, streak: p.streak, correct: x.a };
+  function updateCounter() {
+    const c = app.querySelector("#answered"); if (!c || H.phase !== "q") return;
+    const n = Object.keys(H.answers).length, of = new Set([...onlineUids(), ...Object.keys(H.answers)]).size;
+    const prev = c.dataset.n;
+    c.innerHTML = `${n}<small>de ${of} respuestas</small>`;
+    if (prev !== undefined && +prev !== n && !reduced) { c.classList.remove("bump"); void c.offsetWidth; c.classList.add("bump"); }
+    c.dataset.n = n;
+  }
+
+  function tick() {
+    const t = now();
+    if (H.phase === "q") {
+      const bar = app.querySelector("#bar"), clk = app.querySelector("#clk");
+      if (t < H.startAt) { if (bar) bar.style.width = ((H.startAt - t) / INTRO_MS * 100) + "%"; }
+      else {
+        if (!H.opened) { H.opened = true; const st = app.querySelector("#stage"); if (st) st.classList.remove("intro"); }
+        const left = Math.max(0, (H.deadline - t) / 1000);
+        if (bar) bar.style.width = (left / H.T * 100) + "%";
+        if (clk) { clk.textContent = Math.ceil(left); clk.classList.toggle("low", left <= 5); }
+        const on = onlineUids();
+        const all = on.length > 0 && on.every(u => H.answers[u]);
+        if (all && !H.allAt) H.allAt = t;
+        if (left <= 0 || (H.allAt && t - H.allAt > 700)) closeQ();
+      }
     }
-    for (const p of H.players.values()) send(p, { t: "res", ...p.last, ...standing(p) });
-    const total = counts.reduce((s, n) => s + n, 0) || 1;
+    if (H.due !== null && !H.paused) {
+      const left = Math.max(0, H.due - t), fill = app.querySelector("#autofill"), lab = app.querySelector("#autolab");
+      if (fill) fill.style.width = (100 - left / H.dueTotal * 100) + "%";
+      if (lab) lab.textContent = `Sigue en ${Math.ceil(left / 1000)} s`;
+      if (left <= 0) { const f = H.dueFn; cancelDue(); f(); }
+    }
+  }
+
+  /* ---- avance automático */
+  function autoBar(label) {
+    return `<div class="autoctl"><div class="autotrack"><i id="autofill"></i></div>
+      <div class="row" style="justify-content:space-between"><span class="muted" id="autolab">${H.set.auto ? "" : "Avance manual"}</span>
+      <div class="row">${H.set.auto ? `<button class="ghost" id="pause">Pausar</button>` : ""}<button class="go" id="nx">${label}</button></div></div></div>`;
+  }
+  function schedule(sec, fn) {
+    H.dueFn = fn; H.paused = false;
+    const nx = app.querySelector("#nx"); if (nx) { nx.onclick = () => { cancelDue(); fn(); }; nx.focus(); }
+    const pb = app.querySelector("#pause"); if (pb) pb.onclick = togglePause;
+    if (H.set.auto) { H.dueTotal = sec * 1000; H.due = now() + H.dueTotal; } else H.due = null;
+  }
+  function cancelDue() { H.due = null; H.paused = false; }
+  function togglePause() {
+    const pb = app.querySelector("#pause"), lab = app.querySelector("#autolab");
+    if (!H.paused && H.due !== null) { H.paused = true; H.pausedLeft = Math.max(0, H.due - now()); if (pb) pb.textContent = "Continuar"; if (lab) lab.textContent = "En pausa"; }
+    else if (H.paused) { H.paused = false; H.due = now() + H.pausedLeft; if (pb) pb.textContent = "Pausar"; }
+  }
+
+  /* ---- revelar */
+  function closeQ() {
+    if (H.phase !== "q") return;
+    H.phase = "reveal";
+    if (H.ansRef) { H.ansRef.off(); H.ansRef = null; }
+    const x = H.deck[H.i], counts = [0, 0, 0, 0];
+    const before = ranking(), prevRank = {}; before.forEach((r, k) => prevRank[r.uid] = k + 1);
+    const prevScore = {}; before.forEach(r => prevScore[r.uid] = r.score);
+    const gained = {};
+    const uids = new Set([...Object.keys(H.players), ...Object.keys(H.answers)]);
+    for (const uid of uids) {
+      const a = H.answers[uid], s = Object.assign({ score: 0, streak: 0, ok: 0 }, H.scores[uid]);
+      if (a && a.k >= 0 && a.k < 4) counts[a.k]++;
+      const inTime = a && a.at <= H.deadline + 1500;
+      const good = !!a && inTime && a.k === x.c;
+      let pts = 0;
+      if (good) {
+        const left = Math.min(H.T, Math.max(0, H.T - Math.max(0, a.at - H.startAt) / 1000));
+        s.streak++; s.ok++; pts = Math.round(500 + 500 * left / H.T) + Math.min(s.streak - 1, 5) * 100; s.score += pts;
+      } else s.streak = 0;
+      gained[uid] = { pts, good, answered: !!a };
+      H.scores[uid] = s;
+    }
+    const after = ranking(), upd = {};
+    after.forEach((r, k) => {
+      const s = H.scores[r.uid] || { score: 0, streak: 0, ok: 0 }, g = gained[r.uid] || { pts: 0, good: false, answered: false };
+      upd["scores/" + r.uid] = { score: s.score, streak: s.streak, ok: s.ok, last: { i: H.i, good: g.good, pts: g.pts, answered: g.answered, rank: k + 1, prevRank: prevRank[r.uid] || 0, of: after.length } };
+    });
+    H.boardData = after.map((r, k) => ({ uid: r.uid, nick: r.nick, score: r.score, streak: r.streak, rank: k + 1, prevRank: prevRank[r.uid] || after.length + 1, prevScore: prevScore[r.uid] || 0, pts: (gained[r.uid] || {}).pts || 0 }));
+    upd.state = { phase: "reveal", i: H.i, n: H.deck.length, l: x.l, q: x.q, opts: x.opts, correct: x.c, counts, e: x.e };
+    H.ref.update(upd).catch(fatal);
+    saveLocal();
+
+    const total = Math.max(1, counts.reduce((s, n) => s + n, 0));
     const last = H.i === H.deck.length - 1;
     app.innerHTML = `
-    <div class="hud"><span class="pill">Pregunta ${H.i + 1} de ${H.deck.length}</span><span class="pill lvl-${x.l}">${LV[x.l].n}</span></div>
-    <div class="qcard"><h2>${esc(x.q)}</h2></div>
-    <div class="grid">${x.opts.map((o, k) => `<div class="ans a${k} ${o === x.a ? "right" : "dim"}"><span class="fill" style="width:${counts[k] / total * 100}%"></span><span class="mk">${o === x.a ? "✓" : MK[k]}</span><span class="t">${esc(o)}</span><span class="n">${counts[k]}</span></div>`).join("")}</div>
-    <div class="explain">${esc(x.e)}</div>
-    <div class="foot"><button class="go" id="nx">${last ? "Ver podio" : "Ver ranking"}</button></div>`;
-    const nx = app.querySelector("#nx"); nx.focus();
-    nx.onclick = () => last ? finish() : board();
+    <div class="stage reveal">
+      <div class="hud"><span class="pill">Pregunta ${H.i + 1} de ${H.deck.length}</span><span class="pill lvl-${x.l}">${LV[x.l].n}</span><span class="pill">${counts[x.c]} de ${counts.reduce((s, n) => s + n, 0)} acertaron</span></div>
+      <div class="qcard"><h2>${esc(x.q)}</h2></div>
+      <div class="grid">${x.opts.map((o, k) => `<div class="ans a${k} ${k === x.c ? "right" : "wrong"}"><span class="fill" style="--w:${counts[k] / total * 100}%"></span><span class="mk">${k === x.c ? "✓" : MK[k]}</span><span class="t">${esc(o)}</span><span class="n">${counts[k]}</span></div>`).join("")}</div>
+      <div class="explain">${esc(x.e)}</div>
+      ${autoBar(last ? "Ver podio" : "Ver ranking")}
+    </div>`;
+    schedule(H.set.reveal, last ? finish : board);
   }
 
+  /* ---- ranking animado */
   function board() {
     H.phase = "board";
-    const r = ranking().slice(0, 5);
+    H.ref.child("state").set({ phase: "board", i: H.i, n: H.deck.length }).catch(fatal);
+    const data = H.boardData.length ? H.boardData : ranking().map((r, k) => ({ ...r, rank: k + 1, prevRank: k + 1, prevScore: r.score, pts: 0 }));
+    const top = data.filter(r => r.rank <= 5);
+    const ROW = 76;
     app.innerHTML = `
     <div class="board">
-      <h2>Ranking</h2>
-      ${r.map((p, i) => `<div class="brow ${i === 0 ? "top" : ""}"><span class="pos">${i + 1}</span><span class="nm">${esc(p.nick)}</span><span>${p.streak > 1 ? "🔥" + p.streak + " " : ""}${fmt(p.score)}</span></div>`).join("") || `<p class="muted" style="text-align:center">Sin jugadores todavía.</p>`}
+      <h2 class="btitle">Ranking</h2>
+      <div class="brows" style="height:${Math.max(1, top.length) * ROW}px">
+        ${top.map(r => `<div class="brow ${r.rank === 1 ? "top" : ""}" data-u="${esc(r.uid)}" style="transform:translateY(${(Math.min(r.prevRank, 6) - 1) * ROW}px);opacity:${r.prevRank > 5 ? 0 : 1}">
+          <span class="pos">${r.rank}</span><span class="nm">${esc(r.nick)}</span>
+          ${r.pts ? `<span class="gain">+${fmt(r.pts)}</span>` : ""}${r.streak > 1 ? `<span class="streak">🔥${r.streak}</span>` : ""}
+          <span class="sc" data-from="${r.prevScore}" data-to="${r.score}">${fmt(r.prevScore)}</span></div>`).join("") || `<p class="muted" style="text-align:center">Sin jugadores todavía.</p>`}
+      </div>
     </div>
-    <div class="foot"><button class="go" id="nx">Siguiente pregunta</button></div>`;
-    const nx = app.querySelector("#nx"); nx.focus();
-    nx.onclick = () => { H.i++; ask(); };
+    ${autoBar("Siguiente pregunta")}`;
+    const rows = app.querySelectorAll(".brow");
+    setTimeout(() => {
+      rows.forEach(el => {
+        const r = top.find(x => x.uid === el.dataset.u);
+        el.style.transform = `translateY(${(r.rank - 1) * ROW}px)`; el.style.opacity = 1;
+        const sc = el.querySelector(".sc"); countUp(sc, +sc.dataset.from, +sc.dataset.to, 1100);
+        el.classList.add("moved");
+      });
+    }, reduced ? 0 : 450);
+    schedule(H.set.board + 1, () => { H.i++; ask(); });
   }
 
+  /* ---- podio */
   function finish() {
-    H.phase = "end";
+    H.phase = "end"; cancelDue();
+    H.ref.child("state").set({ phase: "end", n: H.deck.length }).catch(fatal);
+    store.del("activePin");
     const r = ranking();
-    for (const p of H.players.values()) send(p, { t: "end", ...standing(p) });
-    const pod = [r[1], r[0], r[2]];
-    const cls = ["p2", "p1", "p3"], num = [2, 1, 3];
+    const pod = [r[1], r[0], r[2]], cls = ["p2", "p1", "p3"], num = [2, 1, 3], delay = [1, 2, 0];
     app.innerHTML = `
     <div class="board">
-      <h2>Podio</h2>
-      <div class="podium">${pod.map((p, i) => p ? `<div class="${cls[i]}"><span class="nm">${esc(p.nick)}</span><span class="sc">${fmt(p.score)} pts</span><div class="step">${num[i]}</div></div>` : `<div></div>`).join("")}</div>
-      ${r.slice(3, 10).map((p, i) => `<div class="brow"><span class="pos">${i + 4}</span><span class="nm">${esc(p.nick)}</span><span>${fmt(p.score)}</span></div>`).join("")}
+      <h2 class="btitle">Podio</h2>
+      <div class="podium">${pod.map((p, i) => p ? `<div class="${cls[i]}" style="--d:${delay[i] * 1.1}s"><span class="nm">${esc(p.nick)}</span><span class="sc">${fmt(p.score)} pts</span><div class="step">${num[i]}</div></div>` : `<div></div>`).join("")}</div>
+      ${r.slice(3, 10).map((p, i) => `<div class="brow static"><span class="pos">${i + 4}</span><span class="nm">${esc(p.nick)}</span><span class="sc">${fmt(p.score)}</span></div>`).join("")}
     </div>
     <div class="foot"><button class="ghost" id="again">Nueva partida con los mismos jugadores</button></div>`;
-    app.querySelector("#again").onclick = () => { for (const p of H.players.values()) Object.assign(p, { score: 0, streak: 0, ok: 0, ans: null, last: null }); lobby(); for (const p of H.players.values()) syncPlayer(p); };
+    setTimeout(() => confetti(5000), reduced ? 0 : 2600);
+    app.querySelector("#again").onclick = async () => {
+      H.scores = {}; H.boardData = [];
+      await H.ref.update({ scores: null, answers: null, state: { phase: "lobby" } });
+      store.set("activePin", H.pin);
+      lobby();
+    };
   }
 
   document.addEventListener("keydown", e => {
-    if (!H.peer || e.target.tagName === "INPUT") return;
-    if (e.key === "Enter" || e.key === " ") { const nx = app.querySelector("#nx"); if (nx && document.activeElement !== nx) { e.preventDefault(); nx.click(); } }
+    if (!H.ref || /INPUT|SELECT/.test(e.target.tagName)) return;
+    if (e.key === " " && app.querySelector("#pause")) { e.preventDefault(); togglePause(); }
+    else if ((e.key === "Enter" || e.key === "ArrowRight") && H.dueFn && H.phase !== "q") {
+      const nx = app.querySelector("#nx"); if (nx && document.activeElement !== nx) { e.preventDefault(); nx.click(); }
+    }
   });
 
   /* ============================================================ JUGADOR */
-  const P = { peer: null, conn: null, pin: "", pid: "", nick: "", i: -1, deadline: 0, timer: null, retry: null, joined: false };
+  const P = { pin: "", ref: null, nick: "", state: null, me: null, sent: {}, view: "", timer: null, lastRank: 0 };
 
-  function playerJoin(pin) {
+  async function playerEntry(pin) {
     P.pin = pin;
-    P.pid = store.get("pid:" + pin) || rid();
-    store.set("pid:" + pin, P.pid);
+    app.innerHTML = `<div class="player">${spinner("Buscando la partida…")}</div>`;
+    try { await signIn(); } catch (e) { return fatal(e); }
+    P.ref = db.ref("games/" + pin);
+    let g;
+    try { g = (await P.ref.child("state").once("value")).val(); } catch (e) { return fatal(e); }
+    if (!g) {
+      app.innerHTML = `<div class="player">${center(`<p class="err">No hay una partida con el PIN ${esc(pin)}.</p><p class="muted">Revisa el número o pide que muestren el QR de nuevo.</p><button class="ghost" onclick="location.href=location.pathname">Volver</button>`)}</div>`;
+      return;
+    }
+    const mine = (await P.ref.child("players/" + UID).once("value")).val();
+    if (mine && mine.nick) { P.nick = mine.nick; return enter(); }
     const saved = store.get("nick") || "";
     app.innerHTML = `
     <div class="player">
@@ -294,98 +468,105 @@
         <label class="label" for="nick">Tu apodo</label>
         <input type="text" id="nick" maxlength="18" autocomplete="nickname" value="${esc(saved)}" placeholder="Ej: Basalto_Feroz">
         <button class="go" id="enter">Entrar</button>
-        <p id="msg" class="muted"></p>
       </div>
     </div>`;
     const inp = app.querySelector("#nick");
-    const go = () => {
-      const n = inp.value.trim(); if (!n) { inp.focus(); return; }
-      P.nick = n; store.set("nick", n); connect();
+    const go = async () => {
+      let n = inp.value.replace(/\s+/g, " ").trim().slice(0, 18); if (!n) { inp.focus(); return; }
+      store.set("nick", n);
+      try {
+        const others = (await P.ref.child("players").once("value")).val() || {};
+        const taken = new Set(Object.entries(others).filter(([u]) => u !== UID).map(([, p]) => (p.nick || "").toLowerCase()));
+        let k = 2; const base = n.slice(0, 15); while (taken.has(n.toLowerCase())) n = base + " " + k++;
+      } catch (e) {}
+      P.nick = n; enter();
     };
     app.querySelector("#enter").onclick = go;
     inp.onkeydown = e => { if (e.key === "Enter") go(); };
     if (!saved) inp.focus();
   }
 
-  function pscreen(html) { app.innerHTML = `<div class="player">${html}</div>`; }
-  function waiting(text) { pscreen(`<div class="center"><div class="spin"></div><p class="muted">${text}</p></div>`); }
-
-  function connect() {
-    if (typeof Peer === "undefined") { pscreen(`<div class="center"><p class="err">No se pudo cargar la conexión.</p></div>`); return; }
-    waiting("Conectando…");
-    if (!P.peer || P.peer.destroyed) {
-      P.peer = new Peer(peerOpts);
-      P.peer.on("open", dial);
-      P.peer.on("disconnected", () => setTimeout(() => { if (!P.peer.destroyed) P.peer.reconnect(); }, 1500));
-      P.peer.on("error", err => {
-        if (err.type === "peer-unavailable") {
-          if (P.joined) { scheduleRetry(); return; }
-          pscreen(`<div class="center"><p class="err">No hay una partida activa con el PIN ${esc(P.pin)}.</p><p class="muted">Revisa el número o pide que muestren el QR de nuevo.</p><button class="ghost" onclick="location.href=location.pathname">Volver</button></div>`);
-          return;
-        }
-        console.warn("PeerJS:", err);
-        if (P.joined) scheduleRetry();
-        else pscreen(`<div class="center"><p class="err">No se pudo conectar (${esc(err.type || "error")}).</p><button class="go" id="rt">Reintentar</button></div>`), app.querySelector("#rt").onclick = connect;
-      });
-    } else if (P.peer.open) dial();
+  async function enter() {
+    const me = P.ref.child("players/" + UID);
+    try {
+      await me.update({ nick: P.nick, online: true, joinedAt: TS });
+    } catch (e) { return fatal(e); }
+    me.child("online").onDisconnect().set(false);
+    db.ref(".info/connected").on("value", s => { if (s.val()) { me.child("online").set(true).catch(() => {}); me.child("online").onDisconnect().set(false); } });
+    P.ref.child("scores/" + UID).on("value", s => { P.me = s.val(); renderPlayer(); });
+    P.ref.child("state").on("value", async s => {
+      P.state = s.val() || { phase: "lobby" };
+      if (P.state.phase === "q" && !(P.state.i in P.sent)) {
+        try { const a = (await P.ref.child(`answers/${P.state.i}/${UID}`).once("value")).val(); if (a) P.sent[P.state.i] = a.k; } catch (e) {}
+      }
+      renderPlayer();
+    });
+    clearInterval(P.timer); P.timer = setInterval(() => { if (P.state && P.state.phase === "q") renderPlayer(); }, 200);
   }
 
-  function dial() {
-    clearTimeout(P.retry);
-    if (P.conn) { try { P.conn.close(); } catch (e) {} }
-    const conn = P.peer.connect(PREFIX + P.pin, { reliable: true });
-    P.conn = conn;
-    const giveUp = setTimeout(() => { if (!conn.open) { if (P.joined) scheduleRetry(); else pscreen(`<div class="center"><p class="err">La conexión está tardando demasiado.</p><p class="muted">Algunas redes (wifi de la universidad, por ejemplo) bloquean este tipo de conexión. Prueba con datos móviles.</p><button class="go" id="rt">Reintentar</button></div>`), app.querySelector("#rt").onclick = dial; } }, 12000);
-    conn.on("open", () => { clearTimeout(giveUp); P.joined = true; conn.send({ t: "join", pid: P.pid, nick: P.nick }); });
-    conn.on("data", onPlayerData);
-    conn.on("close", () => { if (P.conn === conn) scheduleRetry(); });
+  function pview(key, html, after) {
+    if (P.view === key) return false;
+    P.view = key;
+    app.innerHTML = `<div class="player">${html}</div>`;
+    if (after) after();
+    return true;
   }
 
-  function scheduleRetry() {
-    clearTimeout(P.retry);
-    if (!app.querySelector(".pgrid")) waiting("Se perdió la conexión. Reconectando…");
-    P.retry = setTimeout(() => { if (P.peer && P.peer.open) dial(); else connect(); }, 2000);
-  }
-
-  function onPlayerData(d) {
-    if (!d || typeof d !== "object") return;
-    clearInterval(P.timer);
-    if (d.nick) P.nick = d.nick;
-    if (d.t === "lobby" || d.t === "wait") {
-      pscreen(`<div class="center"><div class="label">Estás dentro</div><div class="big">${esc(P.nick)}</div><p class="muted">${d.t === "lobby" ? "Mira la pantalla, el juego empieza pronto." : "Espera la siguiente pregunta."}</p></div>`);
-    } else if (d.t === "q") {
-      P.i = d.i;
-      if (d.answered) { sent(); return; }
-      P.deadline = performance.now() + d.remain;
-      pscreen(`
-        <div class="hud"><span class="pill">${d.i + 1} / ${d.n}</span><span class="pill lvl-${esc(d.l)}">${esc((LV[d.l] || {}).n || "")}</span><span class="pill" id="pc">–</span></div>
-        <p style="font-weight:700">${esc(d.q)}</p>
-        <div class="pgrid">${d.opts.map((o, k) => `<button class="ans a${k}" data-k="${k}"><span class="mk">${MK[k]}</span><span class="t">${esc(o)}</span></button>`).join("")}</div>`);
-      app.querySelectorAll(".pgrid .ans").forEach(b => b.onclick = () => {
-        if (!P.conn || !P.conn.open) return;
-        P.conn.send({ t: "ans", i: P.i, k: Number(b.dataset.k) });
-        app.querySelectorAll(".pgrid .ans").forEach(x => { x.disabled = true; if (x !== b) x.classList.add("dim"); });
-      });
-      const pc = app.querySelector("#pc");
-      const tick = () => { const s = Math.max(0, Math.ceil((P.deadline - performance.now()) / 1000)); pc.textContent = s + " s"; if (s <= 0) { clearInterval(P.timer); waiting("Se acabó el tiempo. Mira la pantalla."); } };
-      tick(); P.timer = setInterval(tick, 250);
-    } else if (d.t === "got") {
-      sent();
-    } else if (d.t === "res") {
-      const title = d.good ? "+" + fmt(d.pts) : (d.answered ? "Incorrecto" : "Sin respuesta");
-      pscreen(`<div class="center">
-        <div class="result ${d.good ? "ok" : "bad"}" style="width:100%"><div class="big">${title}</div>${d.good && d.streak > 1 ? `<p style="margin-top:8px;font-weight:700">Racha de ${d.streak} 🔥</p>` : ""}</div>
-        ${d.good ? "" : `<p class="muted">Correcta: <b style="color:var(--fg)">${esc(d.correct)}</b></p>`}
-        <p style="font-size:22px">Vas en el lugar <b>#${d.rank}</b> de ${d.of}</p>
-        <p class="muted">${fmt(d.score)} puntos</p></div>`);
-    } else if (d.t === "end") {
-      pscreen(`<div class="center"><div class="label">Fin del juego</div><div class="big">#${d.rank}</div><p style="font-size:22px">de ${d.of} jugadores</p><p class="muted">${fmt(d.score)} puntos · ${esc(P.nick)}</p></div>`);
+  function renderPlayer() {
+    const s = P.state; if (!s) return;
+    const t = now();
+    if (s.phase === "lobby") {
+      P.sent = {};
+      pview("lobby", center(`<div class="label">Estás dentro</div><div class="big pop">${esc(P.nick)}</div><p class="muted">Mira la pantalla, el juego empieza pronto.</p>`));
+    } else if (s.phase === "q") {
+      if (s.i in P.sent) {
+        pview("sent" + s.i, center(`<div class="sentmark a${P.sent[s.i]} pop">${MK[P.sent[s.i]] || "✓"}</div><div class="big" style="font-size:34px">Respuesta enviada</div><p class="muted">Esperando a los demás…</p>`));
+      } else if (t < s.startAt) {
+        const fresh = pview("intro" + s.i, `<div class="hud"><span class="pill">${s.i + 1} / ${s.n}</span><span class="pill lvl-${esc(s.l)}">${esc((LV[s.l] || {}).n || "")}</span></div>
+          ${center(`<div class="label">Pregunta ${s.i + 1}</div><p class="qtext">${esc(s.q)}</p><div class="count" id="cd">3</div>`)}`);
+        const cd = app.querySelector("#cd"); if (cd) { const v = String(Math.max(1, Math.ceil((s.startAt - t) / 1000))); if (cd.textContent !== v || fresh) { cd.textContent = v; cd.classList.remove("pop"); void cd.offsetWidth; cd.classList.add("pop"); } }
+      } else if (t < s.deadline) {
+        pview("q" + s.i, `
+          <div class="hud"><span class="pill">${s.i + 1} / ${s.n}</span><span class="pill lvl-${esc(s.l)}">${esc((LV[s.l] || {}).n || "")}</span><span class="pill" id="pc"></span></div>
+          <p class="qsmall">${esc(s.q)}</p>
+          <div class="pgrid">${arr(s.opts).map((o, k) => `<button class="ans a${k}" data-k="${k}" style="--d:${k * 70}ms"><span class="mk">${MK[k]}</span><span class="t">${esc(o)}</span></button>`).join("")}</div>`,
+          () => app.querySelectorAll(".pgrid .ans").forEach(b => b.onclick = () => answer(s.i, +b.dataset.k)));
+        const pc = app.querySelector("#pc"); if (pc) pc.textContent = Math.ceil((s.deadline - t) / 1000) + " s";
+      } else {
+        pview("late" + s.i, center(`<div class="big" style="font-size:34px">Se acabó el tiempo</div><p class="muted">Mira la pantalla.</p>`));
+      }
+    } else if (s.phase === "reveal") {
+      const L = P.me && P.me.last;
+      if (!L || L.i !== s.i) { pview("wait-r" + s.i, spinner("Revelando…")); return; }
+      const title = L.good ? "+" + fmt(L.pts) : (L.answered ? "Incorrecto" : "Sin respuesta");
+      const correct = arr(s.opts)[s.correct];
+      pview("rev" + s.i, center(`
+        <div class="result ${L.good ? "ok" : "bad"} pop" style="width:100%"><div class="label" style="color:inherit;opacity:.75">${L.good ? "¡Correcto!" : "Esta vez no"}</div><div class="big">${title}</div>${L.good && P.me.streak > 1 ? `<p style="margin-top:8px;font-weight:700">Racha de ${P.me.streak} 🔥</p>` : ""}</div>
+        ${L.good ? "" : `<p class="muted">Correcta: <b style="color:var(--fg)">${esc(correct)}</b></p>`}
+        <p class="muted">${fmt(P.me.score)} puntos en total</p>`));
+    } else if (s.phase === "board") {
+      const L = P.me && P.me.last; if (!L) { pview("wait-b", spinner("Mira el ranking en la pantalla")); return; }
+      const d = L.prevRank ? L.prevRank - L.rank : 0;
+      const move = d > 0 ? `<p class="up">▲ Subiste ${d} lugar${d > 1 ? "es" : ""}</p>` : d < 0 ? `<p class="down">▼ Bajaste ${-d} lugar${d < -1 ? "es" : ""}</p>` : "";
+      pview("board" + s.i, center(`<div class="label">Vas en el lugar</div><div class="big pop" style="font-size:96px">#${L.rank}</div><p>de ${L.of} jugadores</p>${move}<p class="muted">${fmt(P.me.score)} puntos</p>`));
+    } else if (s.phase === "end") {
+      const L = P.me && P.me.last, rank = L ? L.rank : 0;
+      const fresh = pview("end", center(`<div class="label">Fin del juego</div><div class="big pop" style="font-size:96px">${rank ? "#" + rank : "—"}</div>${L ? `<p style="font-size:22px">de ${L.of} jugadores</p>` : ""}<p class="muted">${fmt(P.me ? P.me.score : 0)} puntos · ${esc(P.nick)}</p>`));
+      if (fresh && rank && rank <= 3) confetti(4000);
     }
   }
 
-  function sent() { pscreen(`<div class="center"><div class="spin"></div><div class="big" style="font-size:36px">Respuesta enviada</div><p class="muted">Esperando a los demás…</p></div>`); }
+  function answer(i, k) {
+    if (i in P.sent) return;
+    P.sent[i] = k;
+    app.querySelectorAll(".pgrid .ans").forEach(b => { b.disabled = true; if (+b.dataset.k !== k) b.classList.add("dim"); else b.classList.add("chosen"); });
+    try { navigator.vibrate && navigator.vibrate(30); } catch (e) {}
+    P.ref.child(`answers/${i}/${UID}`).set({ k, at: TS }).then(() => setTimeout(renderPlayer, 250)).catch(() => {
+      P.view = ""; app.innerHTML = `<div class="player">${center(`<div class="big" style="font-size:30px">No alcanzó a llegar</div><p class="muted">La pregunta ya se había cerrado.</p>`)}</div>`; P.view = "late" + i;
+    });
+  }
 
   /* ------------------------------------------------------------ inicio */
   const pin = (params.get("pin") || "").replace(/\D/g, "");
-  if (pin.length === 6) playerJoin(pin); else home();
+  if (pin.length === 6) playerEntry(pin); else home();
 })();
