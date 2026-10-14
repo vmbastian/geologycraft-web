@@ -27,7 +27,8 @@ C) CÓMO SE JUEGA
   4. Cada pregunta se muestra 3 s antes de abrir las alternativas. Cuando responden
      todos los conectados (o se acaba el tiempo) pasa sola a la respuesta, luego al
      ranking animado y luego a la siguiente pregunta.
-  Teclado del presentador: Espacio = pausar/continuar, Enter o → = avanzar ya.
+  Teclado del presentador: Espacio = pausar/continuar, Enter o → = avanzar ya, M = música on/off.
+  La música suena solo en el computador del presentador (botón abajo a la derecha).
   Si se cae o recargas la pestaña del presentador, al volver a "Crear partida"
   aparece la opción "Retomar".
 
@@ -39,6 +40,7 @@ Archivos
   index.html            la página
   app.css / app.js      estilos y lógica (presentador y jugadores)
   preguntas.js          banco de preguntas
+  music.js              música y efectos, sintetizados en vivo (sin archivos de audio)
   firebase-config.js    datos de tu proyecto de Firebase (rellenar)
   reglas-firebase.json  reglas de seguridad para pegar en Realtime Database
   vendor/               Firebase y generador de QR, incluidos localmente

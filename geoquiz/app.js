@@ -32,6 +32,8 @@
   const center = html => `<div class="center">${html}</div>`;
   const spinner = text => center(`<div class="spin"></div><p class="muted">${text}</p>`);
 
+  const M = window.Music || { init() {}, play() {}, sfx() {}, toggle() { return true; }, muted: true };
+
   /* ------------------------------------------------------------ Firebase */
   const cfg = window.FIREBASE_CONFIG;
   if (!cfg || !cfg.apiKey || /PEGAR/.test(cfg.apiKey + cfg.databaseURL)) {
@@ -124,6 +126,7 @@
   };
 
   async function hostEntry() {
+    M.init();
     app.innerHTML = spinner("Conectando…");
     try { await signIn(); } catch (e) { return fatal(e); }
     const active = store.get("activePin");
@@ -162,6 +165,7 @@
     H.ref.child("players").on("value", s => { H.players = s.val() || {}; refreshLive(); }, fatal);
     try { navigator.wakeLock && navigator.wakeLock.request("screen").catch(() => {}); } catch (e) {}
     clearInterval(H.ticker); H.ticker = setInterval(tick, 100);
+    soundButton();
   }
 
   async function resume(pin, g) {
@@ -185,9 +189,19 @@
       .sort((a, b) => b.score - a.score || b.ok - a.ok || a.nick.localeCompare(b.nick));
   }
 
+  /* ---- botón de música (solo presentador) */
+  function soundButton() {
+    if (document.getElementById("snd")) return;
+    const b = document.createElement("button");
+    b.id = "snd"; b.className = "snd"; b.type = "button";
+    const paint = () => { b.textContent = M.muted ? "🔇 Música" : "🔊 Música"; b.setAttribute("aria-pressed", String(!M.muted)); b.title = "Silenciar o activar (tecla M)"; };
+    b.onclick = () => { M.init(); M.toggle(); paint(); };
+    paint(); document.body.appendChild(b); document.body.classList.add("hosting");
+  }
+
   /* ---- lobby */
   function lobby() {
-    H.phase = "lobby"; cancelDue();
+    H.phase = "lobby"; cancelDue(); M.play("lobby");
     const counts = { todas: Q.length }; Q.forEach(x => counts[x.l] = (counts[x.l] || 0) + 1);
     const chip = (k, n) => `<button class="chip" data-k="${k}" aria-pressed="${H.set.sel === k}">${n}<small>${counts[k] || 0}</small></button>`;
     const secs = (id, val, opts) => `<select id="${id}">${opts.map(o => `<option value="${o}" ${o == val ? "selected" : ""}>${o} s</option>`).join("")}</select>`;
@@ -258,7 +272,8 @@
     cancelDue();
     const x = H.deck[H.i];
     H.phase = "q"; H.T = LV[x.l].t; H.opened = false; H.allAt = 0; H.answers = {};
-    H.startAt = now() + INTRO_MS; H.deadline = H.startAt + H.T * 1000;
+    H.startAt = now() + INTRO_MS; H.deadline = H.startAt + H.T * 1000; H.lastTick = 99;
+    M.play("none"); M.sfx("whoosh");
     saveLocal();
     if (H.ansRef) H.ansRef.off();
     H.ansRef = H.ref.child("answers/" + H.i);
@@ -288,6 +303,7 @@
     const n = Object.keys(H.answers).length, of = new Set([...onlineUids(), ...Object.keys(H.answers)]).size;
     const prev = c.dataset.n;
     c.innerHTML = `${n}<small>de ${of} respuestas</small>`;
+    if (prev !== undefined && +prev < n) M.sfx("blip");
     if (prev !== undefined && +prev !== n && !reduced) { c.classList.remove("bump"); void c.offsetWidth; c.classList.add("bump"); }
     c.dataset.n = n;
   }
@@ -298,10 +314,11 @@
       const bar = app.querySelector("#bar"), clk = app.querySelector("#clk");
       if (t < H.startAt) { if (bar) bar.style.width = ((H.startAt - t) / INTRO_MS * 100) + "%"; }
       else {
-        if (!H.opened) { H.opened = true; const st = app.querySelector("#stage"); if (st) st.classList.remove("intro"); }
+        if (!H.opened) { H.opened = true; const st = app.querySelector("#stage"); if (st) st.classList.remove("intro"); M.play("question"); }
         const left = Math.max(0, (H.deadline - t) / 1000);
         if (bar) bar.style.width = (left / H.T * 100) + "%";
         if (clk) { clk.textContent = Math.ceil(left); clk.classList.toggle("low", left <= 5); }
+        const sec = Math.ceil(left); if (sec <= 5 && sec > 0 && sec < H.lastTick) { H.lastTick = sec; M.sfx("tick"); }
         const on = onlineUids();
         const all = on.length > 0 && on.every(u => H.answers[u]);
         if (all && !H.allAt) H.allAt = t;
@@ -339,6 +356,7 @@
   function closeQ() {
     if (H.phase !== "q") return;
     H.phase = "reveal";
+    M.play("none"); M.sfx("reveal");
     if (H.ansRef) { H.ansRef.off(); H.ansRef = null; }
     const x = H.deck[H.i], counts = [0, 0, 0, 0];
     const before = ranking(), prevRank = {}; before.forEach((r, k) => prevRank[r.uid] = k + 1);
@@ -384,6 +402,7 @@
   /* ---- ranking animado */
   function board() {
     H.phase = "board";
+    M.sfx("roll"); setTimeout(() => { if (H.phase === "board") M.play("lobby"); }, 1300);
     H.ref.child("state").set({ phase: "board", i: H.i, n: H.deck.length }).catch(fatal);
     const data = H.boardData.length ? H.boardData : ranking().map((r, k) => ({ ...r, rank: k + 1, prevRank: k + 1, prevScore: r.score, pts: 0 }));
     const top = data.filter(r => r.rank <= 5);
@@ -414,6 +433,8 @@
   /* ---- podio */
   function finish() {
     H.phase = "end"; cancelDue();
+    M.play("none"); setTimeout(() => M.sfx("roll"), reduced ? 0 : 1200); setTimeout(() => M.sfx("fanfare"), reduced ? 0 : 2400);
+    setTimeout(() => { if (H.phase === "end") M.play("lobby"); }, 6500);
     H.ref.child("state").set({ phase: "end", n: H.deck.length }).catch(fatal);
     store.del("activePin");
     const r = ranking();
@@ -436,6 +457,7 @@
 
   document.addEventListener("keydown", e => {
     if (!H.ref || /INPUT|SELECT/.test(e.target.tagName)) return;
+    if (e.key === "m" || e.key === "M") { const b = document.getElementById("snd"); if (b) b.click(); return; }
     if (e.key === " " && app.querySelector("#pause")) { e.preventDefault(); togglePause(); }
     else if ((e.key === "Enter" || e.key === "ArrowRight") && H.dueFn && H.phase !== "q") {
       const nx = app.querySelector("#nx"); if (nx && document.activeElement !== nx) { e.preventDefault(); nx.click(); }
