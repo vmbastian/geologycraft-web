@@ -97,10 +97,19 @@
   }
 
   /* ---------- efectos */
-  function sfx(name) {
+  // n = número de jugador: cada uno suena un paso más arriba en una escala pentatónica
+  const PENTA = [0, 2, 4, 7, 9];
+  function sfx(name, n) {
     if (!ctx) return;
     const t = ctx.currentTime + 0.01;
     switch (name) {
+      case "join": {
+        const k = (n || 0) % 15, base = N.C5 + 12 * Math.floor(k / 5) + PENTA[k % 5] - 12;
+        tone(hz(base), t, 0.09, "square", 0.08, sfxBus);
+        tone(hz(base + 7), t + 0.07, 0.16, "triangle", 0.16, sfxBus);
+        tone(hz(base + 12), t + 0.07, 0.22, "sine", 0.1, sfxBus, 0.01);
+        noise(t, 0.05, 0.08, 3000, "bandpass", sfxBus);
+        break; }
       case "tick": tone(1600, t, 0.05, "square", 0.12, sfxBus); break;
       case "blip": tone(880, t, 0.07, "triangle", 0.18, sfxBus); tone(1320, t + 0.05, 0.08, "triangle", 0.14, sfxBus); break;
       case "whoosh": { const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();

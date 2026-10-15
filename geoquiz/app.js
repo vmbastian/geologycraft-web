@@ -347,7 +347,7 @@
           el = document.createElement("button"); el.type = "button"; el.className = "rp"; el.dataset.u = u; el.title = "Clic para expulsar";
           el.onclick = () => armKick(el, u, nickOf(u));
           list.appendChild(el);
-          if (H.players[u].online) M.sfx("blip");
+          if (H.players[u].online) M.sfx("join", list.querySelectorAll(".rp").length - 1);
         }
         if (!el.classList.contains("arm")) el.innerHTML = `<span class="rp-av">${avSvg(embOf(u) || "geomorfo", true)}</span><span class="nm">${esc(nickOf(u))}</span>`;
         el.classList.toggle("off", !H.players[u].online);
