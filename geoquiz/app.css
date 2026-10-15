@@ -174,3 +174,33 @@ select{background:var(--bg3);color:var(--fg);border:1px solid var(--line);border
 .snd:hover{opacity:1}
 .snd[aria-pressed="false"]{color:var(--mute)}
 body.hosting .wrap{padding-bottom:max(72px,env(safe-area-inset-bottom,0px))}
+
+/* ilustraciones de líneas */
+.ilus{display:block;width:100%;height:auto;overflow:visible}
+.ilus .th{stroke-width:1}
+.ilt{fill:currentColor;stroke:none;font-family:var(--body);font-weight:700}
+.wrap{position:relative;z-index:1}
+#deco{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.deco-it{position:absolute;color:var(--fg);opacity:.11;max-width:220px;min-width:70px}
+.deco-it:nth-child(2n){color:var(--accent);opacity:.16}
+.bgart{position:fixed;z-index:0;pointer-events:none;left:-3vw;bottom:-8vh;width:min(36vw,440px);color:var(--accent);opacity:.14;transform:rotate(-8deg)}
+.bgart.still{opacity:.1}
+.bgart .ilus [pathLength]{stroke-dasharray:1;stroke-dashoffset:1;animation:draw 2.4s cubic-bezier(.4,0,.2,1) forwards}
+.bgart.still .ilus [pathLength]{animation:none;stroke-dashoffset:0}
+.bgart .ilt{opacity:0;animation:fadein .6s ease-out 1.6s forwards}
+.bgart.still .ilt{opacity:1;animation:none}
+@keyframes draw{to{stroke-dashoffset:0}}
+@keyframes fadein{to{opacity:1}}
+.pill-art{width:120px;color:var(--accent)}
+.pill-art .ilus [pathLength]{stroke-dasharray:1;stroke-dashoffset:1;animation:draw 2s ease-out forwards}
+.pill-art .ilt{opacity:0;animation:fadein .5s ease-out 1.4s forwards}
+@media (max-width:640px){.deco-it{opacity:.08}.bgart{width:70vw;opacity:.12}}
+@media (prefers-reduced-motion:reduce){.bgart .ilus [pathLength],.pill-art .ilus [pathLength]{stroke-dashoffset:0}.bgart .ilt,.pill-art .ilt{opacity:1}}
+.qart{flex:none;width:clamp(56px,7vw,96px);color:#17181c;align-self:center}
+.qart .ilus{stroke-width:2}
+.qart .ilus [pathLength]{stroke-dasharray:1;stroke-dashoffset:1;animation:draw 1.8s cubic-bezier(.4,0,.2,1) .2s forwards}
+.qart .ilt{opacity:0;animation:fadein .5s ease-out 1.4s forwards}
+.qart.still .ilus [pathLength]{animation:none;stroke-dashoffset:0}
+.qart.still .ilt{opacity:1;animation:none}
+@media (max-width:640px){.qart{display:none}}
+@media (prefers-reduced-motion:reduce){.qart .ilus [pathLength]{stroke-dashoffset:0}.qart .ilt{opacity:1}}

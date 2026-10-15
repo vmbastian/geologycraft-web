@@ -29,6 +29,16 @@
   const joinUrl = pin => location.origin + location.pathname + "?pin=" + pin;
   // Firebase puede devolver listas como objetos {0:…,1:…}; esto las normaliza
   const arr = v => Array.isArray(v) ? v : (v && typeof v === "object" ? Object.keys(v).sort((a, b) => a - b).map(k => v[k]) : []);
+  // Ilustraciones de líneas (ilustraciones.js). art() = una grande de fondo; setDeco() = varias repartidas por la pantalla.
+  const IL = window.ILUS;
+  const art = (t, cls) => IL ? `<div class="bgart ${cls || ""}">${IL.svg(t)}</div>` : "";
+  function setDeco(names) {
+    let d = document.getElementById("deco");
+    if (!d) { d = document.createElement("div"); d.id = "deco"; d.setAttribute("aria-hidden", "true"); document.body.prepend(d); }
+    const key = (names || []).join(",");
+    if (d.dataset.k === key) return;
+    d.dataset.k = key; d.innerHTML = IL && names ? IL.deco(names) : "";
+  }
   const center = html => `<div class="center">${html}</div>`;
   const spinner = text => center(`<div class="spin"></div><p class="muted">${text}</p>`);
 
@@ -90,6 +100,7 @@
 
   /* ------------------------------------------------------------ PORTADA */
   function home() {
+    setDeco(["amonite", "trilobite", "volcan", "cristal", "piqueta", "acido", "rayador"]);
     app.innerHTML = `
     <section class="hero">
       <div class="label">GeologyCraft · Repaso de geología general</div>
@@ -229,6 +240,7 @@
   /* ---- lobby */
   function lobby() {
     H.phase = "lobby"; cancelDue(); M.play("lobby");
+    setDeco(["amonite", "trilobite", "cristal", "piqueta", "acido", "rayador", "lupa"]);
     const counts = { todas: Q.length }; Q.forEach(x => { counts[x.l] = (counts[x.l] || 0) + 1; if (x.j) counts["j" + x.j] = (counts["j" + x.j] || 0) + 1; });
     if (!counts[H.set.sel]) H.set.sel = "todas";
     const chip = (k, n) => `<button class="chip" data-k="${k}" aria-pressed="${H.set.sel === k}">${n}<small>${counts[k] || 0}</small></button>`;
@@ -296,7 +308,7 @@
     let d = Q.filter(x => sel === "todas" || x.l === sel || (sel[0] === "j" && String(x.j) === sel.slice(1)));
     // Mezclado: orden al azar. Sin mezclar: de fácil a difícil.
     d = H.set.mix ? shuffle(d) : d.map((x, k) => [x, k]).sort((a, b) => (ORD[a[0].l] - ORD[b[0].l]) || a[1] - b[1]).map(p => p[0]);
-    H.deck = d.map(x => { const opts = shuffle([x.a, ...x.w]); return { q: x.q, l: x.l, e: x.e, opts, c: opts.indexOf(x.a) }; });
+    H.deck = d.map(x => { const opts = shuffle([x.a, ...x.w]); return { q: x.q, l: x.l, e: x.e, t: x.t, opts, c: opts.indexOf(x.a) }; });
     H.i = 0; H.scores = {};
     await H.ref.update({ scores: null, answers: null });
     ask();
@@ -306,6 +318,7 @@
   function ask() {
     cancelDue();
     const x = H.deck[H.i];
+    setDeco(null);
     H.phase = "q"; H.T = LV[x.l].t; H.opened = false; H.allAt = 0; H.answers = {};
     H.startAt = now() + INTRO_MS; H.deadline = H.startAt + H.T * 1000; H.lastTick = 99;
     M.play("none"); M.sfx("whoosh");
@@ -313,15 +326,16 @@
     if (H.ansRef) H.ansRef.off();
     H.ansRef = H.ref.child("answers/" + H.i);
     H.ansRef.on("value", s => { H.answers = s.val() || {}; updateCounter(); });
-    H.ref.child("state").set({ phase: "q", i: H.i, n: H.deck.length, l: x.l, q: x.q, opts: x.opts, T: H.T, startAt: H.startAt, deadline: H.deadline }).catch(fatal);
+    H.ref.child("state").set({ phase: "q", i: H.i, n: H.deck.length, l: x.l, q: x.q, t: x.t || "", opts: x.opts, T: H.T, startAt: H.startAt, deadline: H.deadline }).catch(fatal);
     app.innerHTML = `
+    ${art(x.t)}
     <div class="stage intro" id="stage">
       <div class="hud">
         <span class="pill">Pregunta ${H.i + 1} de ${H.deck.length}</span>
         <span class="pill lvl-${x.l}">${LV[x.l].n}</span>
         <span class="pill">PIN ${H.pin}</span>
       </div>
-      <div class="qcard"><h2>${esc(x.q)}</h2><div class="clock" id="clk">${H.T}</div></div>
+      <div class="qcard">${IL && x.t ? `<div class="qart">${IL.svg(x.t)}</div>` : ""}<h2>${esc(x.q)}</h2><div class="clock" id="clk">${H.T}</div></div>
       <div class="bar"><i id="bar"></i></div>
       <div class="grid" id="opts">${x.opts.map((o, k) => `<div class="ans a${k}" style="--d:${k * 90}ms"><span class="mk">${MK[k]}</span><span class="t">${esc(o)}</span></div>`).join("")}</div>
       <div class="foot" style="align-items:center;justify-content:space-between">
@@ -424,9 +438,10 @@
     const total = Math.max(1, counts.reduce((s, n) => s + n, 0));
     const last = H.i === H.deck.length - 1;
     app.innerHTML = `
+    ${art(x.t, "still")}
     <div class="stage reveal">
       <div class="hud"><span class="pill">Pregunta ${H.i + 1} de ${H.deck.length}</span><span class="pill lvl-${x.l}">${LV[x.l].n}</span><span class="pill">${counts[x.c]} de ${counts.reduce((s, n) => s + n, 0)} acertaron</span></div>
-      <div class="qcard"><h2>${esc(x.q)}</h2></div>
+      <div class="qcard">${IL && x.t ? `<div class="qart still">${IL.svg(x.t)}</div>` : ""}<h2>${esc(x.q)}</h2></div>
       <div class="grid">${x.opts.map((o, k) => `<div class="ans a${k} ${k === x.c ? "right" : "wrong"}"><span class="fill" style="--w:${counts[k] / total * 100}%"></span><span class="mk">${k === x.c ? "✓" : MK[k]}</span><span class="t">${esc(o)}</span><span class="n">${counts[k]}</span></div>`).join("")}</div>
       <div class="explain">${esc(x.e)}</div>
       ${autoBar(last ? "Ver podio" : "Ver ranking")}
@@ -436,7 +451,7 @@
 
   /* ---- ranking animado */
   function board() {
-    H.phase = "board";
+    H.phase = "board"; setDeco(["trilobite", "amonite", "montana", "clastos"]);
     M.sfx("roll"); setTimeout(() => { if (H.phase === "board") M.play("lobby"); }, 1300);
     H.ref.child("state").set({ phase: "board", i: H.i, n: H.deck.length }).catch(fatal);
     const data = H.boardData.length ? H.boardData : ranking().map((r, k) => ({ ...r, rank: k + 1, prevRank: k + 1, prevScore: r.score, pts: 0 }));
@@ -468,7 +483,7 @@
 
   /* ---- podio */
   function finish() {
-    H.phase = "end"; cancelDue();
+    H.phase = "end"; cancelDue(); setDeco(["amonite", "trilobite", "cristal", "volcan", "piqueta", "rayador", "acido"]);
     M.play("none"); setTimeout(() => M.sfx("roll"), reduced ? 0 : 1200); setTimeout(() => M.sfx("fanfare"), reduced ? 0 : 2400);
     setTimeout(() => { if (H.phase === "end") M.play("lobby"); }, 6500);
     H.ref.child("state").set({ phase: "end", n: H.deck.length }).catch(fatal);
@@ -589,7 +604,7 @@
         pview("sent" + s.i, center(`<div class="sentmark a${P.sent[s.i]} pop">${MK[P.sent[s.i]] || "✓"}</div><div class="big" style="font-size:34px">Respuesta enviada</div><p class="muted">Esperando a los demás…</p>`));
       } else if (t < s.startAt) {
         const fresh = pview("intro" + s.i, `<div class="hud"><span class="pill">${s.i + 1} / ${s.n}</span><span class="pill lvl-${esc(s.l)}">${esc((LV[s.l] || {}).n || "")}</span></div>
-          ${center(`<div class="label">Pregunta ${s.i + 1}</div><p class="qtext">${esc(s.q)}</p><div class="count" id="cd">3</div>`)}`);
+          ${center(`${IL && s.t ? `<div class="pill-art">${IL.svg(s.t)}</div>` : ""}<div class="label">Pregunta ${s.i + 1}</div><p class="qtext">${esc(s.q)}</p><div class="count" id="cd">3</div>`)}`);
         const cd = app.querySelector("#cd"); if (cd) { const v = String(Math.max(1, Math.ceil((s.startAt - t) / 1000))); if (cd.textContent !== v || fresh) { cd.textContent = v; cd.classList.remove("pop"); void cd.offsetWidth; cd.classList.add("pop"); } }
       } else if (t < s.deadline) {
         pview("q" + s.i, `

@@ -34,13 +34,16 @@ C) CÓMO SE JUEGA
   aparece la opción "Retomar".
 
 D) EDITAR PREGUNTAS
-  Todo está en preguntas.js. Cada pregunta tiene nivel, enunciado, respuesta correcta,
-  3 alternativas incorrectas y una explicación.
+  Todo está en preguntas.js. Cada pregunta tiene juego (j), nivel, ilustración (t), enunciado,
+  respuesta correcta, 3 alternativas incorrectas y una explicación.
+  Ilustraciones disponibles para t: amonite, trilobite, volcan, capas, intrusion, piqueta, acido,
+  rayador, cristal, lupa, tierra, placas, montana, corriente, clastos, termometro.
 
 Archivos
   index.html            la página
   app.css / app.js      estilos y lógica (presentador y jugadores)
   preguntas.js          banco de preguntas
+  ilustraciones.js      dibujos de líneas (amonite, trilobite, etc.) en SVG, sin imágenes
   music.js              música y efectos, sintetizados en vivo (sin archivos de audio)
   firebase-config.js    datos de tu proyecto de Firebase (rellenar)
   reglas-firebase.json  reglas de seguridad para pegar en Realtime Database
