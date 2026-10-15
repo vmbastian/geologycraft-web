@@ -6,14 +6,14 @@
         ".write": "auth != null && (!data.exists() || data.child('host').val() === auth.uid)",
         "players": {
           "$uid": {
-            ".write": "auth != null && auth.uid === $uid",
+            ".write": "auth != null && auth.uid === $uid && !root.child('games').child($pin).child('kicked').child($uid).exists()",
             ".validate": "newData.child('nick').isString() && newData.child('nick').val().length > 0 && newData.child('nick').val().length <= 18"
           }
         },
         "answers": {
           "$i": {
             "$uid": {
-              ".write": "auth != null && auth.uid === $uid && !data.exists() && root.child('games').child($pin).child('state').child('phase').val() === 'q' && (root.child('games').child($pin).child('state').child('i').val() + '') === $i",
+              ".write": "auth != null && auth.uid === $uid && !data.exists() && !root.child('games').child($pin).child('kicked').child($uid).exists() && root.child('games').child($pin).child('state').child('phase').val() === 'q' && (root.child('games').child($pin).child('state').child('i').val() + '') === $i",
               ".validate": "newData.child('k').isNumber() && newData.child('k').val() >= 0 && newData.child('k').val() <= 3 && newData.child('at').val() === now"
             }
           }

@@ -51,8 +51,12 @@ input:focus{border-color:var(--accent);outline:none}
 .url{font-size:20px;word-break:break-all}
 .url b{color:var(--accent)}
 .players{display:flex;flex-wrap:wrap;gap:8px}
-.players span{background:var(--bg3);border-radius:999px;padding:7px 14px;font-weight:700;animation:pop .25s ease-out}
-.players span.off{opacity:.4}
+.players span,.players .pl{background:var(--bg3);border:0;border-radius:999px;padding:7px 14px;font-weight:700;font-size:17px;color:var(--fg);animation:pop .25s ease-out}
+.players .pl{cursor:pointer;transition:background .15s}
+.players .pl:hover{background:color-mix(in srgb,var(--bad) 35%,var(--bg3))}
+.players .off{opacity:.4}
+.players .pl.arm,.brow.arm{background:var(--bad);color:#fff;opacity:1}
+.hint{text-transform:none;letter-spacing:0;font-weight:400}
 @keyframes pop{from{transform:scale(.7);opacity:0}}
 .setup{display:grid;gap:12px;background:var(--bg2);border-radius:16px;padding:18px}
 
@@ -88,6 +92,7 @@ input:focus{border-color:var(--accent);outline:none}
 .brow .pos{font-family:var(--display);font-weight:800;width:36px;color:var(--mute)}
 .brow .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .brow.top{background:var(--bg3)}
+.brows .brow{cursor:pointer}
 .brow.top .pos{color:var(--accent)}
 .podium{display:flex;justify-content:center;align-items:flex-end;gap:14px;margin-top:20px}
 .podium > div{flex:1;max-width:220px;display:flex;flex-direction:column;align-items:center;gap:8px;min-width:0}

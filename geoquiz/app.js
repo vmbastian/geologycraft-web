@@ -118,8 +118,8 @@
   /* ============================================================ PRESENTADOR */
   const H = {
     pin: "", ref: null, deck: [], i: 0, phase: "lobby",
-    set: Object.assign({ sel: "todas", mix: true, auto: true, reveal: 3, board: 5 }, store.get("settings") || {}),
-    players: {}, scores: {}, answers: {}, ansRef: null,
+    set: Object.assign({ sel: "j1", mix: true, auto: true, reveal: 3, board: 5 }, store.get("settings") || {}),
+    players: {}, scores: {}, answers: {}, ansRef: null, kicked: {},
     startAt: 0, deadline: 0, T: 0, opened: false, allAt: 0,
     due: null, dueFn: null, dueTotal: 0, paused: false, pausedLeft: 0,
     boardData: [], ticker: null
@@ -162,7 +162,12 @@
   function startHosting(pin) {
     H.pin = pin; H.ref = db.ref("games/" + pin);
     store.set("activePin", pin);
-    H.ref.child("players").on("value", s => { H.players = s.val() || {}; refreshLive(); }, fatal);
+    H.ref.child("players").on("value", s => {
+      const all = s.val() || {}; H.players = {};
+      for (const u in all) if (!H.kicked[u] && all[u] && all[u].nick) H.players[u] = all[u];
+      refreshLive();
+    }, fatal);
+    H.ref.child("kicked").on("value", s => { H.kicked = s.val() || {}; });
     try { navigator.wakeLock && navigator.wakeLock.request("screen").catch(() => {}); } catch (e) {}
     clearInterval(H.ticker); H.ticker = setInterval(tick, 100);
     soundButton();
@@ -199,10 +204,33 @@
     paint(); document.body.appendChild(b); document.body.classList.add("hosting");
   }
 
+  /* ---- expulsar jugadores */
+  function kick(uid) {
+    if (!uid) return;
+    H.kicked[uid] = true;
+    delete H.players[uid]; delete H.scores[uid]; delete H.answers[uid];
+    H.boardData = H.boardData.filter(r => r.uid !== uid);
+    const upd = {}; upd["kicked/" + uid] = true; upd["players/" + uid] = null; upd["scores/" + uid] = null;
+    if (H.phase === "q") upd["answers/" + H.i + "/" + uid] = null;
+    H.ref.update(upd).catch(fatal);
+    refreshLive();
+  }
+  // Primer clic: pide confirmación en el mismo elemento. Segundo clic (antes de 4 s): expulsa.
+  function armKick(el, uid, label) {
+    if (el.classList.contains("arm")) { el.classList.remove("arm"); el.remove(); kick(uid); return; }
+    document.querySelectorAll(".arm").forEach(x => { x.classList.remove("arm"); x.dataset.label && (x.querySelector(".nm") || x).replaceChildren(x.dataset.label); });
+    el.dataset.label = label;
+    el.classList.add("arm");
+    (el.querySelector(".nm") || el).textContent = "¿Expulsar a " + label + "?";
+    clearTimeout(el._t);
+    el._t = setTimeout(() => { if (el.isConnected && el.classList.contains("arm")) { el.classList.remove("arm"); (el.querySelector(".nm") || el).textContent = label; } }, 4000);
+  }
+
   /* ---- lobby */
   function lobby() {
     H.phase = "lobby"; cancelDue(); M.play("lobby");
-    const counts = { todas: Q.length }; Q.forEach(x => counts[x.l] = (counts[x.l] || 0) + 1);
+    const counts = { todas: Q.length }; Q.forEach(x => { counts[x.l] = (counts[x.l] || 0) + 1; if (x.j) counts["j" + x.j] = (counts["j" + x.j] || 0) + 1; });
+    if (!counts[H.set.sel]) H.set.sel = "todas";
     const chip = (k, n) => `<button class="chip" data-k="${k}" aria-pressed="${H.set.sel === k}">${n}<small>${counts[k] || 0}</small></button>`;
     const secs = (id, val, opts) => `<select id="${id}">${opts.map(o => `<option value="${o}" ${o == val ? "selected" : ""}>${o} s</option>`).join("")}</select>`;
     let qrImg = "";
@@ -214,11 +242,11 @@
         <div><div class="label">Escanea el QR o entra a</div>
           <p class="url">${esc(location.host + location.pathname)} <span class="muted">con el PIN</span></p></div>
         <div class="pin">${H.pin.slice(0, 3)} ${H.pin.slice(3)}</div>
-        <div><div class="label" id="pcount">Jugadores (0)</div><div class="players" id="plist" style="margin-top:10px"></div></div>
+        <div><div class="label"><span id="pcount">Jugadores (0)</span> <span class="hint">· clic en un nombre para expulsar</span></div><div class="players" id="plist" style="margin-top:10px"></div></div>
         <div class="setup">
           <div class="label">Preguntas</div>
-          <div class="row" id="lv">${chip("todas", "Todas")}${chip("facil", "Fáciles")}${chip("intermedia", "Intermedias")}${chip("dificil", "Difíciles")}</div>
-          <label class="check"><input type="checkbox" id="mix" ${H.set.mix ? "checked" : ""}> Mezclar el orden</label>
+          <div class="row" id="lv">${chip("j1", "Juego 1")}${chip("j2", "Juego 2")}${chip("todas", "Todas")}${chip("facil", "Fáciles")}${chip("intermedia", "Intermedias")}${chip("dificil", "Difíciles")}</div>
+          <label class="check"><input type="checkbox" id="mix" ${H.set.mix ? "checked" : ""}> Mezclar el orden <span class="hint">(si no, va de fácil a difícil)</span></label>
           <label class="check"><input type="checkbox" id="auto" ${H.set.auto ? "checked" : ""}> Avanzar solo</label>
           <div class="row muted" id="autoopts" ${H.set.auto ? "" : "hidden"}>
             <label>Respuesta en pantalla ${secs("rv", H.set.reveal, [3, 5, 8, 12])}</label>
@@ -249,8 +277,13 @@
         if (!have.size) list.innerHTML = "";
         for (const u of ids) {
           let el = list.querySelector(`[data-u="${u}"]`);
-          if (!el) { el = document.createElement("span"); el.dataset.u = u; list.appendChild(el); }
-          el.textContent = nickOf(u); el.classList.toggle("off", !H.players[u].online);
+          if (!el) {
+            el = document.createElement("button"); el.type = "button"; el.className = "pl"; el.dataset.u = u; el.title = "Clic para expulsar";
+            el.onclick = () => armKick(el, u, nickOf(u));
+            list.appendChild(el);
+          }
+          if (!el.classList.contains("arm")) el.textContent = nickOf(u);
+          el.classList.toggle("off", !H.players[u].online);
         }
         list.querySelectorAll("[data-u]").forEach(e => { if (!H.players[e.dataset.u]) e.remove(); });
       }
@@ -259,8 +292,10 @@
   }
 
   async function startGame() {
-    let d = Q.filter(x => H.set.sel === "todas" || x.l === H.set.sel);
-    if (H.set.mix) d = shuffle(d);
+    const sel = H.set.sel, ORD = { facil: 0, intermedia: 1, dificil: 2 };
+    let d = Q.filter(x => sel === "todas" || x.l === sel || (sel[0] === "j" && String(x.j) === sel.slice(1)));
+    // Mezclado: orden al azar. Sin mezclar: de fácil a difícil.
+    d = H.set.mix ? shuffle(d) : d.map((x, k) => [x, k]).sort((a, b) => (ORD[a[0].l] - ORD[b[0].l]) || a[1] - b[1]).map(p => p[0]);
     H.deck = d.map(x => { const opts = shuffle([x.a, ...x.w]); return { q: x.q, l: x.l, e: x.e, opts, c: opts.indexOf(x.a) }; });
     H.i = 0; H.scores = {};
     await H.ref.update({ scores: null, answers: null });
@@ -419,6 +454,7 @@
     </div>
     ${autoBar("Siguiente pregunta")}`;
     const rows = app.querySelectorAll(".brow");
+    rows.forEach(el => { el.title = "Clic para expulsar"; el.onclick = () => armKick(el, el.dataset.u, (top.find(x => x.uid === el.dataset.u) || {}).nick || "Jugador"); });
     setTimeout(() => {
       rows.forEach(el => {
         const r = top.find(x => x.uid === el.dataset.u);
@@ -465,7 +501,7 @@
   });
 
   /* ============================================================ JUGADOR */
-  const P = { pin: "", ref: null, nick: "", state: null, me: null, sent: {}, view: "", timer: null, lastRank: 0 };
+  const P = { kicked: false, pin: "", ref: null, nick: "", state: null, me: null, sent: {}, view: "", timer: null, lastRank: 0 };
 
   async function playerEntry(pin) {
     P.pin = pin;
@@ -478,6 +514,7 @@
       app.innerHTML = `<div class="player">${center(`<p class="err">No hay una partida con el PIN ${esc(pin)}.</p><p class="muted">Revisa el número o pide que muestren el QR de nuevo.</p><button class="ghost" onclick="location.href=location.pathname">Volver</button>`)}</div>`;
       return;
     }
+    if ((await P.ref.child("kicked/" + UID).once("value")).val()) return kickedScreen();
     const mine = (await P.ref.child("players/" + UID).once("value")).val();
     if (mine && mine.nick) { P.nick = mine.nick; return enter(); }
     const saved = store.get("nick") || "";
@@ -515,6 +552,7 @@
     } catch (e) { return fatal(e); }
     me.child("online").onDisconnect().set(false);
     db.ref(".info/connected").on("value", s => { if (s.val()) { me.child("online").set(true).catch(() => {}); me.child("online").onDisconnect().set(false); } });
+    P.ref.child("kicked/" + UID).on("value", s => { if (s.val()) kickedScreen(); });
     P.ref.child("scores/" + UID).on("value", s => { P.me = s.val(); renderPlayer(); });
     P.ref.child("state").on("value", async s => {
       P.state = s.val() || { phase: "lobby" };
@@ -526,6 +564,12 @@
     clearInterval(P.timer); P.timer = setInterval(() => { if (P.state && P.state.phase === "q") renderPlayer(); }, 200);
   }
 
+  function kickedScreen() {
+    P.kicked = true; clearInterval(P.timer);
+    if (P.ref) { P.ref.child("state").off(); P.ref.child("scores/" + UID).off(); }
+    app.innerHTML = `<div class="player">${center(`<div class="big" style="font-size:40px">Fuiste expulsado</div><p class="muted">El presentador te sacó de esta partida.</p>`)}</div>`;
+  }
+
   function pview(key, html, after) {
     if (P.view === key) return false;
     P.view = key;
@@ -535,7 +579,7 @@
   }
 
   function renderPlayer() {
-    const s = P.state; if (!s) return;
+    const s = P.state; if (!s || P.kicked) return;
     const t = now();
     if (s.phase === "lobby") {
       P.sent = {};
