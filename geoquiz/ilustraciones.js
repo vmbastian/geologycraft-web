@@ -238,7 +238,81 @@
     return o;
   }
 
-  const ART = { amonite, trilobite, volcan, capas, intrusion, piqueta, acido, rayador, cristal, lupa, tierra, placas, montana, corriente, clastos, termometro };
+
+  /* ---------- sismograma (Geofísica) */
+  function sismo() {
+    let o = "";
+    o += P("M6,18 L94,18", thin) + P("M6,82 L94,82", thin);
+    for (let x = 14; x < 94; x += 16) o += L(x, 18, x, 22, thin) + L(x, 78, x, 82, thin);
+    let d = "M6,50", k = 0;
+    for (let x = 8; x <= 94; x += 1.6) {
+      const env = 30 * Math.exp(-Math.pow((x - 42) / 13, 2)) + 12 * Math.exp(-Math.pow((x - 66) / 9, 2)) + 1.5;
+      d += ` L${f(x)},${f(50 + (k++ % 2 ? 1 : -1) * env * (0.55 + 0.45 * Math.abs(Math.sin(x * 0.9))))}`;
+    }
+    o += P(d);
+    o += P("M24,30 L24,40", thin) + T(24, 28, 8, "P") + P("M54,30 L54,40", thin) + T(54, 28, 8, "S");
+    return o;
+  }
+
+  /* ---------- pliegues cortados por una falla (Geología Estructural) */
+  function pliegue() {
+    let o = "";
+    const fx = y => 60 - (y - 6) * 0.07;                       // traza de la falla
+    for (let i = 0; i < 4; i++) {
+      const y0 = 30 + i * 12; let dl = "", dr = "";
+      for (let x = 6; x <= 94; x += 2) {
+        const yl = y0 + 12 * Math.sin((x - 6) / 14), yr = yl + 10;
+        if (x <= fx(yl) - 2) dl += (dl ? " L" : "M") + f(x) + "," + f(yl);
+        else if (x >= fx(yr) + 2) dr += (dr ? " L" : "M") + f(x) + "," + f(yr);
+      }
+      o += P(dl, i % 2 ? thin : "") + P(dr, i % 2 ? thin : "");
+    }
+    o += P("M60,6 L53.8,94");
+    o += P("M66,12 L66,22 M62,18 L66,22 L70,18", thin) + P("M48,84 L48,74 M44,78 L48,74 L52,78", thin);
+    return o;
+  }
+
+  /* ---------- brújula Brunton (Mapeo Geológico) */
+  function brujula() {
+    let o = "";
+    o += C(46, 58, 30) + C(46, 58, 24, thin);
+    for (let a = 0; a < 360; a += 30) { const r = a * Math.PI / 180; o += L(46 + 24 * Math.cos(r), 58 + 24 * Math.sin(r), 46 + 20 * Math.cos(r), 58 + 20 * Math.sin(r), thin); }
+    o += P("M46,58 L54,38 L46,58 L38,78");
+    o += P("M46,58 L54,38 L49,58 Z") + C(46, 58, 2);
+    o += T(46, 44, 8, "N");
+    o += P("M24,30 L68,30 L72,20 L28,20 Z", thin);               // tapa con espejo
+    o += P("M76,58 L94,58 L94,52", "");                           // brazo de mira
+    o += P("M30,28 L66,28", thin);
+    return o;
+  }
+
+  /* ---------- acuífero y pozo (Hidrogeología) */
+  function acuifero() {
+    let o = "";
+    o += P("M50,8 C44,18 40,24 40,30 C40,36 45,40 50,40 C55,40 60,36 60,30 C60,24 56,18 50,8 Z");
+    o += P("M6,48 C30,44 60,52 94,48");
+    o += `<line x1="6" y1="62" x2="70" y2="62" class="th" stroke-dasharray="3 4"/>`;   // nivel freático
+    o += P("M30,54 L38,54 L34,60 Z", thin) + P("M31,57.5 L37,57.5", thin);
+    o += P("M6,74 C30,72 60,76 94,74") + P("M6,90 C30,88 60,92 94,90");
+    for (let x = 10; x < 92; x += 7) o += C(x, 82, 1, thin);
+    o += P("M76,40 L76,88") + P("M82,40 L82,88") + P("M72,40 L86,40", thin);
+    o += P("M18,66 L28,66 M24,63 L28,66 L24,69", thin);
+    return o;
+  }
+
+  /* ---------- curvas de nivel y rumbo-manteo (Cartografía y SIG) */
+  function mapa() {
+    let o = "";
+    o += P("M8,10 L92,10 L92,90 L8,90 Z", thin);
+    const blob = (cx, cy, r, w) => { let d = ""; for (let a = 0; a <= 360; a += 10) { const t = a * Math.PI / 180, rr = r * (1 + w * Math.sin(3 * t) + w * 0.6 * Math.cos(5 * t)); d += (d ? " L" : "M") + f(cx + rr * Math.cos(t) * 1.25) + "," + f(cy + rr * Math.sin(t)); } return d + " Z"; };
+    [30, 22, 14, 7].forEach((r, i) => o += P(blob(46, 52, r, 0.08 + i * 0.01), i % 2 ? thin : ""));
+    o += P("M46,49 L49,55 L43,55 Z");
+    o += P("M76,22 L86,22 M81,22 L81,28", "") + T(80, 36, 8, "35");  // símbolo rumbo/manteo
+    o += P("M18,82 L18,70 M14,74 L18,70 L22,74", thin) + T(18, 66, 8, "N");
+    return o;
+  }
+
+  const ART = { sismo, pliegue, brujula, acuifero, mapa, amonite, trilobite, volcan, capas, intrusion, piqueta, acido, rayador, cristal, lupa, tierra, placas, montana, corriente, clastos, termometro };
   const cache = {};
   function svg(name, cls) {
     const fn = ART[name] || ART.amonite;
@@ -253,5 +327,24 @@
       return `<div class="deco-it" style="left:${x}%;top:${y}%;width:${s}vw;transform:rotate(${r}deg)">${svg(n)}</div>`;
     }).join("");
   }
-  window.ILUS = { svg, deco, names: Object.keys(ART) };
+  // Emblemas de jugador: ramos emblemáticos de la malla de Geología UCM
+  const EMBLEMAS = [
+    { id: "geofisica", n: "Geofísica", t: "tierra" },
+    { id: "estructural", n: "Geo. Estructural", t: "brujula" },
+    { id: "geomorfo", n: "Geomorfología", t: "montana" },
+    { id: "vulcano", n: "Volcanología", t: "volcan" },
+    { id: "mapeo", n: "Mapeo Geológico", t: "mapa" },
+    { id: "sig", n: "Cartografía y SIG", t: "capas" },
+    { id: "endogena", n: "Petrología Endógena", t: "intrusion" },
+    { id: "exogena", n: "Petrología Exógena", t: "corriente" },
+    { id: "cristalo", n: "Cristalografía", t: "lupa" },
+    { id: "geoquimica", n: "Geoquímica", t: "acido" },
+    { id: "hidro", n: "Hidrogeología", t: "acuifero" },
+    { id: "remociones", n: "Remociones en Masa", t: "clastos" },
+    { id: "metalo", n: "Metalogénesis", t: "piqueta" },
+    { id: "estrati", n: "Estratigrafía Andina", t: "capas" },
+    { id: "geopatrimonio", n: "Geopatrimonio", t: "volcan" }
+  ];
+  const emblema = id => EMBLEMAS.find(e => e.id === id) || null;
+  window.ILUS = { svg, deco, names: Object.keys(ART), EMBLEMAS, emblema };
 })();

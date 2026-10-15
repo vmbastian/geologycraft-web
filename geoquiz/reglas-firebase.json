@@ -7,7 +7,7 @@
         "players": {
           "$uid": {
             ".write": "auth != null && auth.uid === $uid && !root.child('games').child($pin).child('kicked').child($uid).exists()",
-            ".validate": "newData.child('nick').isString() && newData.child('nick').val().length > 0 && newData.child('nick').val().length <= 18"
+            ".validate": "newData.child('nick').isString() && newData.child('nick').val().length > 0 && newData.child('nick').val().length <= 18 && (!newData.child('e').exists() || (newData.child('e').isString() && newData.child('e').val().length <= 20))"
           }
         },
         "answers": {

@@ -21,7 +21,8 @@ B) SUBIRLO AL SITIO
 
 C) CÓMO SE JUEGA
   1. En el computador del proyector abre geologycraft.lol/geoquiz → "Crear partida".
-  2. Los jugadores escanean el QR (o escriben el PIN) y eligen un apodo.
+  2. Los jugadores escanean el QR (o escriben el PIN), eligen un apodo y un emblema
+     (15 ramos de la malla de Geología UCM). El emblema sale junto a su nombre en el ranking.
   3. Elige el nivel, si quieres que avance solo y cuántos segundos mostrar
      la respuesta y el ranking. Pulsa "Comenzar".
   4. Cada pregunta se muestra 3 s antes de abrir las alternativas. Cuando responden
@@ -37,12 +38,15 @@ D) EDITAR PREGUNTAS
   Todo está en preguntas.js. Cada pregunta tiene juego (j), nivel, ilustración (t), enunciado,
   respuesta correcta, 3 alternativas incorrectas y una explicación.
   Ilustraciones disponibles para t: amonite, trilobite, volcan, capas, intrusion, piqueta, acido,
-  rayador, cristal, lupa, tierra, placas, montana, corriente, clastos, termometro.
+  rayador, cristal, lupa, tierra, placas, montana, corriente, clastos, termometro,
+  sismo, pliegue, brujula, acuifero, mapa.
+  Los emblemas de jugador se editan al final de ilustraciones.js (lista EMBLEMAS).
 
 Archivos
   index.html            la página
   app.css / app.js      estilos y lógica (presentador y jugadores)
   preguntas.js          banco de preguntas
+  avatares.js           mascotas a color de cada emblema y paisaje del podio (SVG, sin imágenes)
   ilustraciones.js      dibujos de líneas (amonite, trilobite, etc.) en SVG, sin imágenes
   music.js              música y efectos, sintetizados en vivo (sin archivos de audio)
   firebase-config.js    datos de tu proyecto de Firebase (rellenar)

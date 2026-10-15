@@ -39,6 +39,12 @@
     if (d.dataset.k === key) return;
     d.dataset.k = key; d.innerHTML = IL && names ? IL.deco(names) : "";
   }
+  // Emblema del jugador (ramo de la malla) → ícono pequeño
+  const EMB = (IL && IL.EMBLEMAS) || [];
+  const AV = window.AVATAR;
+  const avSvg = (id, tile) => AV && AV.svg(id, { tile }) ? AV.svg(id, { tile }) : (IL && IL.emblema(id) ? IL.svg(IL.emblema(id).t) : "");
+  const embIcon = (id, cls) => { const e = IL && IL.emblema(id); return e ? `<span class="emb ${cls || ""}" title="${esc(e.n)}">${avSvg(id, true)}</span>` : ""; };
+  const embName = id => { const e = IL && IL.emblema(id); return e ? e.n : ""; };
   const center = html => `<div class="center">${html}</div>`;
   const spinner = text => center(`<div class="spin"></div><p class="muted">${text}</p>`);
 
@@ -198,10 +204,11 @@
 
   function saveLocal() { store.set("host:" + H.pin, { deck: H.deck, i: H.i, set: H.set }); store.set("settings", H.set); }
   const nickOf = uid => (H.players[uid] && H.players[uid].nick) || "Jugador";
+  const embOf = uid => (H.players[uid] && H.players[uid].e) || "";
   const onlineUids = () => Object.keys(H.players).filter(u => H.players[u].online);
   function ranking() {
     const ids = new Set([...Object.keys(H.players), ...Object.keys(H.scores)]);
-    return [...ids].map(uid => ({ uid, nick: nickOf(uid), score: (H.scores[uid] || {}).score || 0, ok: (H.scores[uid] || {}).ok || 0, streak: (H.scores[uid] || {}).streak || 0 }))
+    return [...ids].map(uid => ({ uid, nick: nickOf(uid), e: embOf(uid), score: (H.scores[uid] || {}).score || 0, ok: (H.scores[uid] || {}).ok || 0, streak: (H.scores[uid] || {}).streak || 0 }))
       .sort((a, b) => b.score - a.score || b.ok - a.ok || a.nick.localeCompare(b.nick));
   }
 
@@ -294,7 +301,7 @@
             el.onclick = () => armKick(el, u, nickOf(u));
             list.appendChild(el);
           }
-          if (!el.classList.contains("arm")) el.textContent = nickOf(u);
+          if (!el.classList.contains("arm")) el.innerHTML = embIcon(embOf(u)) + `<span class="nm">${esc(nickOf(u))}</span>`;
           el.classList.toggle("off", !H.players[u].online);
         }
         list.querySelectorAll("[data-u]").forEach(e => { if (!H.players[e.dataset.u]) e.remove(); });
@@ -430,7 +437,7 @@
       const s = H.scores[r.uid] || { score: 0, streak: 0, ok: 0 }, g = gained[r.uid] || { pts: 0, good: false, answered: false };
       upd["scores/" + r.uid] = { score: s.score, streak: s.streak, ok: s.ok, last: { i: H.i, good: g.good, pts: g.pts, answered: g.answered, rank: k + 1, prevRank: prevRank[r.uid] || 0, of: after.length } };
     });
-    H.boardData = after.map((r, k) => ({ uid: r.uid, nick: r.nick, score: r.score, streak: r.streak, rank: k + 1, prevRank: prevRank[r.uid] || after.length + 1, prevScore: prevScore[r.uid] || 0, pts: (gained[r.uid] || {}).pts || 0 }));
+    H.boardData = after.map((r, k) => ({ uid: r.uid, nick: r.nick, e: r.e, score: r.score, streak: r.streak, rank: k + 1, prevRank: prevRank[r.uid] || after.length + 1, prevScore: prevScore[r.uid] || 0, pts: (gained[r.uid] || {}).pts || 0 }));
     upd.state = { phase: "reveal", i: H.i, n: H.deck.length, l: x.l, q: x.q, opts: x.opts, correct: x.c, counts, e: x.e };
     H.ref.update(upd).catch(fatal);
     saveLocal();
@@ -462,7 +469,7 @@
       <h2 class="btitle">Ranking</h2>
       <div class="brows" style="height:${Math.max(1, top.length) * ROW}px">
         ${top.map(r => `<div class="brow ${r.rank === 1 ? "top" : ""}" data-u="${esc(r.uid)}" style="transform:translateY(${(Math.min(r.prevRank, 6) - 1) * ROW}px);opacity:${r.prevRank > 5 ? 0 : 1}">
-          <span class="pos">${r.rank}</span><span class="nm">${esc(r.nick)}</span>
+          <span class="pos">${r.rank}</span>${embIcon(r.e)}<span class="nm">${esc(r.nick)}</span>
           ${r.pts ? `<span class="gain">+${fmt(r.pts)}</span>` : ""}${r.streak > 1 ? `<span class="streak">🔥${r.streak}</span>` : ""}
           <span class="sc" data-from="${r.prevScore}" data-to="${r.score}">${fmt(r.prevScore)}</span></div>`).join("") || `<p class="muted" style="text-align:center">Sin jugadores todavía.</p>`}
       </div>
@@ -490,13 +497,19 @@
     store.del("activePin");
     const r = ranking();
     const pod = [r[1], r[0], r[2]], cls = ["p2", "p1", "p3"], num = [2, 1, 3], delay = [1, 2, 0];
+    const gem = n => `<svg class="gem" viewBox="0 0 60 60" aria-hidden="true"><path d="M30,3 L54,17 L54,43 L30,57 L6,43 L6,17 Z" fill="var(--g1)" stroke="#2a2233" stroke-width="3" stroke-linejoin="round"/><path d="M30,3 L6,17 L6,43 L30,57 Z" fill="var(--g2)"/><path d="M30,3 L54,17 L54,43 L30,57 L6,43 L6,17 Z" fill="none" stroke="#2a2233" stroke-width="3" stroke-linejoin="round"/><text x="30" y="40" text-anchor="middle" font-size="28" font-weight="800" fill="#2a2233">${n}</text></svg>`;
+    if (AV) setDeco(null);
     app.innerHTML = `
-    <div class="board">
-      <h2 class="btitle">Podio</h2>
-      <div class="podium">${pod.map((p, i) => p ? `<div class="${cls[i]}" style="--d:${delay[i] * 1.1}s"><span class="nm">${esc(p.nick)}</span><span class="sc">${fmt(p.score)} pts</span><div class="step">${num[i]}</div></div>` : `<div></div>`).join("")}</div>
-      ${r.slice(3, 10).map((p, i) => `<div class="brow static"><span class="pos">${i + 4}</span><span class="nm">${esc(p.nick)}</span><span class="sc">${fmt(p.score)}</span></div>`).join("")}
+    ${AV ? `<div class="podscene">${AV.scene()}</div>` : ""}
+    <div class="podwrap">
+      <h2 class="podtitle"><small>Geoquiz</small>Podio</h2>
+      <div class="podium3">${pod.map((p, i) => p ? `<div class="col ${cls[i]}" style="--d:${delay[i] * 1.1}s">
+          <div class="hero-av">${avSvg(p.e || "geomorfo", false)}</div>
+          <div class="block">${gem(num[i])}<span class="nm">${esc(p.nick)}</span><span class="sc">${fmt(p.score)}</span></div>
+        </div>` : `<div class="col empty"></div>`).join("")}</div>
+      ${r.length > 3 ? `<div class="rest">${r.slice(3, 10).map((p, i) => `<div class="brow static"><span class="pos">${i + 4}</span>${embIcon(p.e)}<span class="nm">${esc(p.nick)}</span><span class="sc">${fmt(p.score)}</span></div>`).join("")}</div>` : ""}
     </div>
-    <div class="foot"><button class="ghost" id="again">Nueva partida con los mismos jugadores</button></div>`;
+    <div class="foot podfoot"><button class="ghost" id="again">Nueva partida con los mismos jugadores</button></div>`;
     setTimeout(() => confetti(5000), reduced ? 0 : 2600);
     app.querySelector("#again").onclick = async () => {
       H.scores = {}; H.boardData = [];
@@ -531,7 +544,7 @@
     }
     if ((await P.ref.child("kicked/" + UID).once("value")).val()) return kickedScreen();
     const mine = (await P.ref.child("players/" + UID).once("value")).val();
-    if (mine && mine.nick) { P.nick = mine.nick; return enter(); }
+    if (mine && mine.nick) { P.nick = mine.nick; P.e = mine.e || store.get("emblema") || ""; return enter(); }
     const saved = store.get("nick") || "";
     app.innerHTML = `
     <div class="player">
@@ -541,13 +554,19 @@
         <p class="muted">PIN <b style="color:var(--fg)">${esc(pin)}</b></p>
         <label class="label" for="nick">Tu apodo</label>
         <input type="text" id="nick" maxlength="18" autocomplete="nickname" value="${esc(saved)}" placeholder="Ej: Basalto_Feroz">
+        ${EMB.length ? `<div class="label" style="margin-top:6px">Tu emblema <span class="hint">· elige un ramo de la malla</span></div>
+        <div class="embgrid" id="embgrid" role="radiogroup" aria-label="Emblema">${EMB.map(e => `<button type="button" class="embopt" role="radio" data-e="${e.id}" aria-checked="false">${avSvg(e.id, true)}<span>${esc(e.n)}</span></button>`).join("")}</div>` : ""}
         <button class="go" id="enter">Entrar</button>
       </div>
     </div>`;
     const inp = app.querySelector("#nick");
+    P.e = store.get("emblema") || (EMB.length ? EMB[Math.floor(Math.random() * EMB.length)].id : "");
+    const pick = id => { P.e = id; app.querySelectorAll(".embopt").forEach(b => b.setAttribute("aria-checked", String(b.dataset.e === id))); };
+    app.querySelectorAll(".embopt").forEach(b => b.onclick = () => pick(b.dataset.e));
+    if (P.e) pick(P.e);
     const go = async () => {
       let n = inp.value.replace(/\s+/g, " ").trim().slice(0, 18); if (!n) { inp.focus(); return; }
-      store.set("nick", n);
+      store.set("nick", n); if (P.e) store.set("emblema", P.e);
       try {
         const others = (await P.ref.child("players").once("value")).val() || {};
         const taken = new Set(Object.entries(others).filter(([u]) => u !== UID).map(([, p]) => (p.nick || "").toLowerCase()));
@@ -563,7 +582,7 @@
   async function enter() {
     const me = P.ref.child("players/" + UID);
     try {
-      await me.update({ nick: P.nick, online: true, joinedAt: TS });
+      await me.update({ nick: P.nick, e: P.e || "", online: true, joinedAt: TS });
     } catch (e) { return fatal(e); }
     me.child("online").onDisconnect().set(false);
     db.ref(".info/connected").on("value", s => { if (s.val()) { me.child("online").set(true).catch(() => {}); me.child("online").onDisconnect().set(false); } });
@@ -595,10 +614,11 @@
 
   function renderPlayer() {
     const s = P.state; if (!s || P.kicked) return;
+    setDeco(s.phase === "q" ? null : s.phase === "reveal" ? ["amonite", "trilobite"] : ["amonite", "trilobite", "cristal", "piqueta", "acido", "rayador", "lupa"]);
     const t = now();
     if (s.phase === "lobby") {
       P.sent = {};
-      pview("lobby", center(`<div class="label">Estás dentro</div><div class="big pop">${esc(P.nick)}</div><p class="muted">Mira la pantalla, el juego empieza pronto.</p>`));
+      pview("lobby", center(`${P.e ? `<div class="me-emb pop">${avSvg(P.e, true)}</div>` : ""}<div class="label">Estás dentro</div><div class="big pop">${esc(P.nick)}</div>${P.e ? `<p class="muted" style="margin-top:-6px">${esc(embName(P.e))}</p>` : ""}<p class="muted">Mira la pantalla, el juego empieza pronto.</p>`));
     } else if (s.phase === "q") {
       if (s.i in P.sent) {
         pview("sent" + s.i, center(`<div class="sentmark a${P.sent[s.i]} pop">${MK[P.sent[s.i]] || "✓"}</div><div class="big" style="font-size:34px">Respuesta enviada</div><p class="muted">Esperando a los demás…</p>`));
@@ -609,7 +629,7 @@
       } else if (t < s.deadline) {
         pview("q" + s.i, `
           <div class="hud"><span class="pill">${s.i + 1} / ${s.n}</span><span class="pill lvl-${esc(s.l)}">${esc((LV[s.l] || {}).n || "")}</span><span class="pill" id="pc"></span></div>
-          <p class="qsmall">${esc(s.q)}</p>
+          <div class="row" style="gap:12px;flex-wrap:nowrap;align-items:center">${IL && s.t ? `<div class="qsmall-art" style="margin:0;flex:none">${IL.svg(s.t)}</div>` : ""}<p class="qsmall">${esc(s.q)}</p></div>
           <div class="pgrid">${arr(s.opts).map((o, k) => `<button class="ans a${k}" data-k="${k}" style="--d:${k * 70}ms"><span class="mk">${MK[k]}</span><span class="t">${esc(o)}</span></button>`).join("")}</div>`,
           () => app.querySelectorAll(".pgrid .ans").forEach(b => b.onclick = () => answer(s.i, +b.dataset.k)));
         const pc = app.querySelector("#pc"); if (pc) pc.textContent = Math.ceil((s.deadline - t) / 1000) + " s";
@@ -629,10 +649,10 @@
       const L = P.me && P.me.last; if (!L) { pview("wait-b", spinner("Mira el ranking en la pantalla")); return; }
       const d = L.prevRank ? L.prevRank - L.rank : 0;
       const move = d > 0 ? `<p class="up">▲ Subiste ${d} lugar${d > 1 ? "es" : ""}</p>` : d < 0 ? `<p class="down">▼ Bajaste ${-d} lugar${d < -1 ? "es" : ""}</p>` : "";
-      pview("board" + s.i, center(`<div class="label">Vas en el lugar</div><div class="big pop" style="font-size:96px">#${L.rank}</div><p>de ${L.of} jugadores</p>${move}<p class="muted">${fmt(P.me.score)} puntos</p>`));
+      pview("board" + s.i, center(`${P.e ? `<div class="me-emb small">${avSvg(P.e, true)}</div>` : ""}<div class="label">Vas en el lugar</div><div class="big pop" style="font-size:96px">#${L.rank}</div><p>de ${L.of} jugadores</p>${move}<p class="muted">${fmt(P.me.score)} puntos</p>`));
     } else if (s.phase === "end") {
       const L = P.me && P.me.last, rank = L ? L.rank : 0;
-      const fresh = pview("end", center(`<div class="label">Fin del juego</div><div class="big pop" style="font-size:96px">${rank ? "#" + rank : "—"}</div>${L ? `<p style="font-size:22px">de ${L.of} jugadores</p>` : ""}<p class="muted">${fmt(P.me ? P.me.score : 0)} puntos · ${esc(P.nick)}</p>`));
+      const fresh = pview("end", center(`${P.e ? `<div class="me-emb pop">${avSvg(P.e, true)}</div>` : ""}<div class="label">Fin del juego</div><div class="big pop" style="font-size:96px">${rank ? "#" + rank : "—"}</div>${L ? `<p style="font-size:22px">de ${L.of} jugadores</p>` : ""}<p class="muted">${fmt(P.me ? P.me.score : 0)} puntos · ${esc(P.nick)}</p>`));
       if (fresh && rank && rank <= 3) confetti(4000);
     }
   }
