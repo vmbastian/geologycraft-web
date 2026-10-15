@@ -202,6 +202,8 @@ button, .btn {
 .grid3 span { width: 44px; height: 44px; display: grid; place-items: center; font-size: 11px; font-weight: 700; border-radius: 4px;
   background: color-mix(in srgb, var(--fg) 8%, var(--surface)); border: 1px solid var(--line); color: var(--fg); }
 .grid3 img { width: 32px; height: 32px; image-rendering: pixelated; }
+.grid3.one { grid-template-columns: 44px; }
+.recipe-out { font-size: 22px; color: var(--muted); }
 .coords { list-style: none; margin: 0; padding: 0; font-family: var(--font-mono); font-size: 15px; display: grid; gap: 4px; }
 .end-note { color: var(--muted); font-size: 15px; margin-top: 10px; }
 .end-steps { margin: 0; padding-left: 22px; display: grid; gap: 8px; font-size: 16px; }
@@ -415,7 +417,7 @@ button, .btn {
               <span title="Polvo de blaze"><img src="polvo-blaze.png" alt=""></span><span title="Ojo Dormido"><img src="ojo-dormido.png" alt=""></span><span title="Polvo de blaze"><img src="polvo-blaze.png" alt=""></span>
               <span title="Perla de ender"><img src="perla-ender.png" alt=""></span><span title="Polvo de blaze"><img src="polvo-blaze.png" alt=""></span><span title="Perla de ender"><img src="perla-ender.png" alt=""></span>
             </div>
-            <span aria-hidden="true">→ Ojo de Ender</span>
+            <span class="recipe-out" aria-hidden="true">→</span><div class="grid3 one" role="img" aria-label="Ojo de Ender"><span title="Ojo de Ender"><img src="ojo-ender.png" alt=""></span></div>
           </div>
           <p class="end-note">En el juego: <span class="cmd">/receta</span></p>
         </div>
