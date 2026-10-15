@@ -204,6 +204,8 @@ button, .btn {
 .grid3 img { width: 32px; height: 32px; image-rendering: pixelated; }
 .coords { list-style: none; margin: 0; padding: 0; font-family: var(--font-mono); font-size: 15px; display: grid; gap: 4px; }
 .end-note { color: var(--muted); font-size: 15px; margin-top: 10px; }
+.end-steps { margin: 0; padding-left: 22px; display: grid; gap: 8px; font-size: 16px; }
+.end-steps li::marker { color: var(--end); font-weight: 700; }
 
 /* ---------- pie ---------- */
 .foot .content { padding-block: 40px 56px; color: var(--muted); font-size: 14px; }
@@ -380,14 +382,23 @@ button, .btn {
   </section>
 
   <!-- Y -56: el End (aparece cuando cae el primer Wither) -->
-  <section class="stratum" id="end" style="--band: var(--end)" aria-labelledby="t-end" hidden>
+  <section class="stratum" id="end" style="--band: var(--end)" aria-labelledby="t-end">
     <div class="rail" aria-hidden="true"><div class="band"></div><span class="y">Y -56</span></div>
     <div class="content">
       <p class="eyebrow">Evento cooperativo</p>
-      <h2 id="t-end">Los Ojos Dormidos</h2>
-      <p class="lead" id="end-lead"></p>
+      <h2 id="t-end">El End está sellado</h2>
+      <p class="lead" id="end-lead">En Geologycraft el End no se abre como siempre: los ojos de ender <b>no se pueden craftear</b> y el portal se gana entre todos.</p>
       <div class="end-box">
-        <div class="end-card">
+        <div class="end-card" id="end-pasos">
+          <h3>Cómo se abre</h3>
+          <ol class="end-steps">
+            <li><b>Derroten al primer Wither.</b> Hay que ir al Nether por wither skeletons y sus cabezas.</li>
+            <li><b>Caen Ojos Dormidos</b> por el mundo, cada cierto tiempo, en coordenadas que se anuncian en el chat y en Discord. Brillan y tienen una columna de luz morada.</li>
+            <li><b>Despiértenlos</b> en la mesa de crafteo con perlas de ender y polvo de blaze, y úsenlos para encontrar y abrir el portal.</li>
+            <li>Cuando alguien cruza al End, <b>vuelve la receta normal</b> del ojo de ender.</li>
+          </ol>
+        </div>
+        <div class="end-card" id="end-progreso" hidden>
           <h3>Progreso del servidor</h3>
           <div class="end-nums">
             <div><b id="end-caidos">0</b><span>ojos caídos</span></div>
@@ -408,7 +419,7 @@ button, .btn {
           </div>
           <p class="end-note">En el juego: <span class="cmd">/receta</span></p>
         </div>
-        <div class="end-card" id="end-ojos-card">
+        <div class="end-card" id="end-ojos-card" hidden>
           <h3>Ojos esperando ser encontrados</h3>
           <ul class="coords" id="end-ojos"></ul>
           <p class="end-note">Busca la columna de luz morada. Brillan a través de las paredes.</p>
@@ -454,8 +465,10 @@ button, .btn {
   fetch('end.json?t=' + Date.now(), { cache: 'no-store' })
     .then(function (r) { return r.ok ? r.json() : null; })
     .then(function (e) {
-      if (!e || !e.fase || e.fase === 'bloqueado') return;
-      var sec = document.getElementById('end');
+      if (!e || !e.fase || e.fase === 'bloqueado') return; // queda el texto de "sellado"
+      document.getElementById('t-end').textContent = 'Los Ojos Dormidos';
+      document.getElementById('end-progreso').hidden = false;
+      document.getElementById('end-ojos-card').hidden = false;
       document.getElementById('end-caidos').textContent = e.caidos || 0;
       document.getElementById('end-encontrados').textContent = e.encontrados || 0;
       document.getElementById('end-despertados').textContent = e.despertados || 0;
@@ -476,10 +489,10 @@ button, .btn {
         document.getElementById('t-end').textContent = 'El End está abierto';
         lead.textContent = quien + (fecha ? ' el ' + fecha : '') + '. Los ojos despertaron y el portal se abrió: ya se pueden craftear ojos de ender normales.';
         document.getElementById('end-ojos-card').hidden = true;
+        document.getElementById('end-pasos').hidden = true;
       } else {
         lead.textContent = quien + (fecha ? ' el ' + fecha : '') + ' y algo despertó en el mundo. Caen Ojos Dormidos en coordenadas anunciadas en el chat y en Discord. Los ojos de ender normales no se pueden craftear hasta que alguien cruce al End.';
       }
-      sec.hidden = false;
     })
     .catch(function () {});
 
