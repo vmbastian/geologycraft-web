@@ -277,3 +277,34 @@ body.hosting .wrap{padding-bottom:max(72px,env(safe-area-inset-bottom,0px))}
 .rest .brow .pos{width:24px}
 .rest .brow{background:rgba(23,24,28,.72);backdrop-filter:blur(4px)}
 .podfoot{position:relative;z-index:1}
+
+/* paso 1: configuración */
+.setup-step{display:grid;gap:20px;max-width:760px;width:100%;margin:6vh auto 0}
+.setup-title{font-size:clamp(36px,5vw,60px);font-weight:800}
+.setup-step .setup{padding:22px}
+.linkbtn{background:none;border:0;color:var(--accent);font-weight:700;text-decoration:underline;padding:0 0 0 6px;cursor:pointer}
+
+/* paso 2: sala con QR al centro y jugadores en anillo */
+.room{display:flex;flex-direction:column;gap:10px;flex:1;min-height:calc(100vh - 48px)}
+.room-top{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.ring{position:relative;flex:1;min-height:560px}
+.room-center{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center}
+.ring.is-ring .room-center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:1}
+.room-center .qrbox{width:min(32vh,300px);padding:14px}
+.room-center .url{font-size:18px;color:var(--mute);margin-top:6px}
+.room-center .pin{font-size:clamp(56px,8vw,96px)}
+.waiting{animation:breathe 2s ease-in-out infinite}
+@keyframes breathe{50%{opacity:.4}}
+.ring-players{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:18px}
+.ring.is-ring .ring-players{position:absolute;inset:0;margin:0;pointer-events:none}
+.rp{display:flex;flex-direction:column;align-items:center;gap:4px;background:none;border:0;color:var(--fg);font-weight:700;font-size:15px;padding:4px;border-radius:14px;cursor:pointer;width:96px;animation:popin .45s cubic-bezier(.2,.9,.3,1.4) both;transition:left .5s ease,top .5s ease}
+.ring.is-ring .rp{position:absolute;transform:translate(-50%,-50%);pointer-events:auto}
+.rp-av{width:58px;height:58px;display:block;filter:drop-shadow(0 4px 0 rgba(0,0,0,.3))}
+.rp-av svg{width:100%;height:100%;display:block}
+.rp .nm{max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-shadow:0 2px 0 rgba(0,0,0,.4)}
+.rp:hover .rp-av{transform:scale(1.06)}
+.rp.off{opacity:.4}
+.rp.arm .nm{color:var(--bad);white-space:normal;font-size:13px}
+.rp.arm .rp-av{outline:3px solid var(--bad);border-radius:16px}
+.room-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+@media (max-width:760px){.ring{min-height:0}.room{min-height:0}}

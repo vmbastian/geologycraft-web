@@ -170,7 +170,7 @@
       const pin = String(Math.floor(100000 + Math.random() * 900000));
       try {
         const res = await db.ref("games/" + pin).transaction(cur => cur === null ? { host: UID, created: Date.now(), state: { phase: "lobby" } } : undefined);
-        if (res.committed) { startHosting(pin); lobby(); return; }
+        if (res.committed) { startHosting(pin); setupScreen(); return; }
       } catch (e) { return fatal(e); }
     }
     fatal({ code: "sin-pin-libre" });
@@ -245,68 +245,116 @@
   }
 
   /* ---- lobby */
-  function lobby() {
-    H.phase = "lobby"; cancelDue(); M.play("lobby");
+  /* ---- paso 1: configuración de la partida */
+  // Tiempo por pregunta: "auto" = según dificultad (20/25/30 s) o un número fijo de segundos
+  const qTime = l => (H.set.qtime && H.set.qtime !== "auto") ? +H.set.qtime : LV[l].t;
+  function qCounts() { const c = { todas: Q.length }; Q.forEach(x => { c[x.l] = (c[x.l] || 0) + 1; if (x.j) c["j" + x.j] = (c["j" + x.j] || 0) + 1; }); return c; }
+  const SEL_NAME = { j1: "Juego 1", j2: "Juego 2", todas: "Todas", facil: "Fáciles", intermedia: "Intermedias", dificil: "Difíciles" };
+  function setupScreen() {
+    H.phase = "setup"; cancelDue(); M.play("lobby");
     setDeco(["amonite", "trilobite", "cristal", "piqueta", "acido", "rayador", "lupa"]);
-    const counts = { todas: Q.length }; Q.forEach(x => { counts[x.l] = (counts[x.l] || 0) + 1; if (x.j) counts["j" + x.j] = (counts["j" + x.j] || 0) + 1; });
+    const counts = qCounts();
     if (!counts[H.set.sel]) H.set.sel = "todas";
-    const chip = (k, n) => `<button class="chip" data-k="${k}" aria-pressed="${H.set.sel === k}">${n}<small>${counts[k] || 0}</small></button>`;
+    const chip = (k) => `<button class="chip" data-k="${k}" aria-pressed="${H.set.sel === k}">${SEL_NAME[k]}<small>${counts[k] || 0}</small></button>`;
     const secs = (id, val, opts) => `<select id="${id}">${opts.map(o => `<option value="${o}" ${o == val ? "selected" : ""}>${o} s</option>`).join("")}</select>`;
-    let qrImg = "";
-    try { const qr = qrcode(0, "M"); qr.addData(joinUrl(H.pin)); qr.make(); qrImg = qr.createImgTag(10, 0); } catch (e) { qrImg = `<p style="color:#17181c">No se pudo generar el QR</p>`; }
     app.innerHTML = `
-    <div class="lobby">
-      <div class="qrbox">${qrImg}</div>
-      <div style="display:grid;gap:20px;min-width:0">
-        <div><div class="label">Escanea el QR o entra a</div>
-          <p class="url">${esc(location.host + location.pathname)} <span class="muted">con el PIN</span></p></div>
-        <div class="pin">${H.pin.slice(0, 3)} ${H.pin.slice(3)}</div>
-        <div><div class="label"><span id="pcount">Jugadores (0)</span> <span class="hint">· clic en un nombre para expulsar</span></div><div class="players" id="plist" style="margin-top:10px"></div></div>
-        <div class="setup">
-          <div class="label">Preguntas</div>
-          <div class="row" id="lv">${chip("j1", "Juego 1")}${chip("j2", "Juego 2")}${chip("todas", "Todas")}${chip("facil", "Fáciles")}${chip("intermedia", "Intermedias")}${chip("dificil", "Difíciles")}</div>
-          <label class="check"><input type="checkbox" id="mix" ${H.set.mix ? "checked" : ""}> Mezclar el orden <span class="hint">(si no, va de fácil a difícil)</span></label>
-          <label class="check"><input type="checkbox" id="auto" ${H.set.auto ? "checked" : ""}> Avanzar solo</label>
-          <div class="row muted" id="autoopts" ${H.set.auto ? "" : "hidden"}>
-            <label>Respuesta en pantalla ${secs("rv", H.set.reveal, [3, 5, 8, 12])}</label>
-            <label>Ranking ${secs("bd", H.set.board, [3, 5, 8])}</label>
-          </div>
+    <section class="setup-step">
+      <div class="label">Paso 1 de 2 · Configura la partida</div>
+      <h1 class="setup-title">¿Qué vamos a jugar?</h1>
+      <div class="setup">
+        <div class="label">Preguntas</div>
+        <div class="row" id="lv">${chip("j1")}${chip("j2")}${chip("todas")}${chip("facil")}${chip("intermedia")}${chip("dificil")}</div>
+        <div class="label" style="margin-top:6px">Tiempo por pregunta</div>
+        <div class="row" id="qt">${[["auto", "Según dificultad", "20 · 25 · 30 s"], ["10", "10 s"], ["15", "15 s"], ["20", "20 s"], ["30", "30 s"], ["45", "45 s"], ["60", "60 s"], ["90", "90 s"]].map(([v, n, sub]) => `<button class="chip" data-t="${v}" aria-pressed="${String(H.set.qtime || "auto") === v}">${n}${sub ? `<small>${sub}</small>` : ""}</button>`).join("")}</div>
+        <label class="check"><input type="checkbox" id="mix" ${H.set.mix ? "checked" : ""}> Mezclar el orden <span class="hint">(si no, va de fácil a difícil)</span></label>
+        <label class="check"><input type="checkbox" id="auto" ${H.set.auto ? "checked" : ""}> Avanzar solo</label>
+        <div class="row muted" id="autoopts" ${H.set.auto ? "" : "hidden"}>
+          <label>Respuesta en pantalla ${secs("rv", H.set.reveal, [3, 5, 8, 12])}</label>
+          <label>Ranking ${secs("bd", H.set.board, [3, 5, 8])}</label>
         </div>
-        <div class="row"><button class="go" id="start" disabled>Comenzar</button><span class="muted">Mantén esta pestaña abierta durante el juego.</span></div>
       </div>
-    </div>`;
+      <div class="row"><button class="go" id="open">Abrir sala</button><span class="muted">Después aparece el QR para que se unan.</span></div>
+    </section>`;
     app.querySelectorAll("#lv .chip").forEach(b => b.onclick = () => { H.set.sel = b.dataset.k; app.querySelectorAll("#lv .chip").forEach(c => c.setAttribute("aria-pressed", c === b)); });
+    app.querySelectorAll("#qt .chip").forEach(b => b.onclick = () => { H.set.qtime = b.dataset.t; app.querySelectorAll("#qt .chip").forEach(c => c.setAttribute("aria-pressed", c === b)); });
     app.querySelector("#mix").onchange = e => H.set.mix = e.target.checked;
     app.querySelector("#auto").onchange = e => { H.set.auto = e.target.checked; app.querySelector("#autoopts").hidden = !H.set.auto; };
     app.querySelector("#rv").onchange = e => H.set.reveal = +e.target.value;
     app.querySelector("#bd").onchange = e => H.set.board = +e.target.value;
+    app.querySelector("#open").onclick = () => { store.set("settings", H.set); lobby(); };
+  }
+
+  /* ---- paso 2: sala de espera — QR al centro, PIN abajo y jugadores en anillo alrededor */
+  function lobby() {
+    H.phase = "lobby"; cancelDue(); M.play("lobby");
+    setDeco(["amonite", "trilobite", "cristal", "piqueta", "acido", "rayador", "lupa"]);
+    const counts = qCounts();
+    let qrImg = "";
+    try { const qr = qrcode(0, "M"); qr.addData(joinUrl(H.pin)); qr.make(); qrImg = qr.createImgTag(10, 0); } catch (e) { qrImg = `<p style="color:#17181c">No se pudo generar el QR</p>`; }
+    const summary = `${SEL_NAME[H.set.sel] || "Todas"} · ${counts[H.set.sel] || Q.length} preguntas · ${(H.set.qtime && H.set.qtime !== "auto") ? H.set.qtime + " s c/u" : "tiempo según dificultad"} · ${H.set.auto ? "avanza solo" : "avance manual"}`;
+    app.innerHTML = `
+    <div class="room">
+      <div class="room-top">
+        <div class="pill">${esc(summary)} <button class="linkbtn" id="cfg">Cambiar</button></div>
+        <div class="pill" id="pcount">0 jugadores</div>
+      </div>
+      <div class="ring" id="ring">
+        <div class="room-center">
+          <div class="qrbox">${qrImg}</div>
+          <p class="url">${esc(location.host + location.pathname)}</p>
+          <div class="pin">${H.pin.slice(0, 3)} ${H.pin.slice(3)}</div>
+          <p class="muted waiting" id="waiting">Esperando jugadores…</p>
+        </div>
+        <div id="plist" class="ring-players"></div>
+      </div>
+      <div class="room-foot">
+        <span class="muted hint">Clic en un jugador para expulsarlo · mantén esta pestaña abierta</span>
+        <button class="go" id="start" disabled>Comenzar</button>
+      </div>
+    </div>`;
+    app.querySelector("#cfg").onclick = setupScreen;
     app.querySelector("#start").onclick = startGame;
     refreshLive();
   }
+
+  // Reparte a los jugadores sobre una elipse alrededor del QR (en pantallas anchas)
+  function placeRing() {
+    const ring = app.querySelector("#ring"), list = app.querySelector("#plist"); if (!ring || !list) return;
+    const els = [...list.querySelectorAll(".rp")], n = els.length;
+    const wide = ring.clientWidth > 760;
+    ring.classList.toggle("is-ring", wide);
+    if (!wide) { els.forEach(e => { e.style.left = e.style.top = ""; }); return; }
+    const W = ring.clientWidth, Hh = ring.clientHeight, two = n > 22;
+    els.forEach((e, i) => {
+      const t = -Math.PI / 2 + (i / Math.max(n, 1)) * Math.PI * 2;
+      const k = two && i % 2 ? .78 : 1;
+      e.style.left = (W / 2 + Math.cos(t) * W * .43 * k) + "px";
+      e.style.top = (Hh / 2 + Math.sin(t) * Hh * .44) + "px";
+    });
+  }
+  window.addEventListener("resize", () => { if (H.phase === "lobby") placeRing(); });
 
   function refreshLive() {
     if (H.phase === "lobby") {
       const list = app.querySelector("#plist"); if (!list) return;
       const ids = Object.keys(H.players).sort((a, b) => (H.players[a].joinedAt || 0) - (H.players[b].joinedAt || 0));
       const on = ids.filter(u => H.players[u].online);
-      app.querySelector("#pcount").textContent = `Jugadores (${on.length})`;
-      const have = new Set([...list.querySelectorAll("[data-u]")].map(e => e.dataset.u));
-      if (!ids.length) list.innerHTML = `<span class="muted" style="background:none;padding:7px 0">Esperando jugadores…</span>`;
-      else {
-        if (!have.size) list.innerHTML = "";
-        for (const u of ids) {
-          let el = list.querySelector(`[data-u="${u}"]`);
-          if (!el) {
-            el = document.createElement("button"); el.type = "button"; el.className = "pl"; el.dataset.u = u; el.title = "Clic para expulsar";
-            el.onclick = () => armKick(el, u, nickOf(u));
-            list.appendChild(el);
-          }
-          if (!el.classList.contains("arm")) el.innerHTML = embIcon(embOf(u)) + `<span class="nm">${esc(nickOf(u))}</span>`;
-          el.classList.toggle("off", !H.players[u].online);
+      app.querySelector("#pcount").textContent = `${on.length} jugador${on.length === 1 ? "" : "es"}`;
+      app.querySelector("#waiting").hidden = ids.length > 0;
+      for (const u of ids) {
+        let el = list.querySelector(`[data-u="${u}"]`);
+        if (!el) {
+          el = document.createElement("button"); el.type = "button"; el.className = "rp"; el.dataset.u = u; el.title = "Clic para expulsar";
+          el.onclick = () => armKick(el, u, nickOf(u));
+          list.appendChild(el);
+          if (H.players[u].online) M.sfx("blip");
         }
-        list.querySelectorAll("[data-u]").forEach(e => { if (!H.players[e.dataset.u]) e.remove(); });
+        if (!el.classList.contains("arm")) el.innerHTML = `<span class="rp-av">${avSvg(embOf(u) || "geomorfo", true)}</span><span class="nm">${esc(nickOf(u))}</span>`;
+        el.classList.toggle("off", !H.players[u].online);
       }
+      list.querySelectorAll("[data-u]").forEach(e => { if (!H.players[e.dataset.u]) e.remove(); });
       app.querySelector("#start").disabled = !on.length;
+      placeRing();
     } else if (H.phase === "q") updateCounter();
   }
 
@@ -326,7 +374,7 @@
     cancelDue();
     const x = H.deck[H.i];
     setDeco(null);
-    H.phase = "q"; H.T = LV[x.l].t; H.opened = false; H.allAt = 0; H.answers = {};
+    H.phase = "q"; H.T = qTime(x.l); H.opened = false; H.allAt = 0; H.answers = {};
     H.startAt = now() + INTRO_MS; H.deadline = H.startAt + H.T * 1000; H.lastTick = 99;
     M.play("none"); M.sfx("whoosh");
     saveLocal();
@@ -515,7 +563,7 @@
       H.scores = {}; H.boardData = [];
       await H.ref.update({ scores: null, answers: null, state: { phase: "lobby" } });
       store.set("activePin", H.pin);
-      lobby();
+      setupScreen();
     };
   }
 

@@ -21,10 +21,11 @@ B) SUBIRLO AL SITIO
 
 C) CÓMO SE JUEGA
   1. En el computador del proyector abre geologycraft.lol/geoquiz → "Crear partida".
+     Paso 1: elige el juego, el tiempo por pregunta (según dificultad o fijo de 10 a 90 s), el orden y los tiempos → "Abrir sala".
+     Paso 2: aparece el QR al centro con el PIN debajo; los jugadores van apareciendo alrededor.
   2. Los jugadores escanean el QR (o escriben el PIN), eligen un apodo y un emblema
      (15 ramos de la malla de Geología UCM). El emblema sale junto a su nombre en el ranking.
-  3. Elige el nivel, si quieres que avance solo y cuántos segundos mostrar
-     la respuesta y el ranking. Pulsa "Comenzar".
+  3. Cuando estén todos, pulsa "Comenzar". ("Cambiar" vuelve a la configuración sin perder a nadie.)
   4. Cada pregunta se muestra 3 s antes de abrir las alternativas. Cuando responden
      todos los conectados (o se acaba el tiempo) pasa sola a la respuesta, luego al
      ranking animado y luego a la siguiente pregunta.
